@@ -14,10 +14,7 @@ def api_client():
 
 @pytest.fixture
 def company():
-    return Company.objects.create(
-        name="Test Company",
-        domain="@testcompany.com"
-    )
+    return Company.objects.create(name="Test Company", domain="@testcompany.com")
 
 
 @pytest.fixture
@@ -28,7 +25,7 @@ def user(company):
         first_name="Test",
         last_name="User",
         role="developer",
-        company=company
+        company=company,
     )
 
 
@@ -41,36 +38,32 @@ def admin_user(company):
         last_name="User",
         role="admin",
         company=company,
-        is_staff=True
+        is_staff=True,
     )
 
 
 @pytest.fixture
 def github_user():
-    return User.objects.create_user(
-        email="githubuser@example.com",
-        first_name="GitHub",
-        last_name="User",
-        password=None
-    )
+    return User.objects.create_user(email="githubuser@example.com", first_name="GitHub", last_name="User", password=None)
 
 
 @pytest.fixture
 def authenticated_client(api_client, user):
     refresh = RefreshToken.for_user(user)
-    api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
 
 
 @pytest.fixture
 def admin_authenticated_client(api_client, admin_user):
     refresh = RefreshToken.for_user(admin_user)
-    api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
 
 
 @pytest.fixture
 def user_session(user):
     from apps.authentication.utils import create_user_session
+
     session, token = create_user_session(user)
     return session, token

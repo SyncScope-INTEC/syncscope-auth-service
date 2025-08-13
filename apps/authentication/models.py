@@ -19,69 +19,63 @@ class Company(RetryableModelMixin, models.Model):
 
     class Meta:
         verbose_name_plural = "Companies"
-        db_table = 'companies'
-        ordering = ['-created_at']
+        db_table = "companies"
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.name
 
     def clean(self):
         from django.core.exceptions import ValidationError
-        if self.domain and not self.domain.startswith('@'):
+
+        if self.domain and not self.domain.startswith("@"):
             self.domain = f"@{self.domain}"
 
 
 class User(RetryableModelMixin, AbstractUser):
     ROLE_CHOICES = [
-        ('admin', 'Admin'),
-        ('developer', 'Developer'),
-        ('manager', 'Manager'),
+        ("admin", "Admin"),
+        ("developer", "Developer"),
+        ("manager", "Manager"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, validators=[EmailValidator()])
-    password = models.CharField(max_length=255, db_column='password_hash')
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='developer')
-    company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
-        related_name='users',
-        null=True,
-        blank=True
-    )
+    password = models.CharField(max_length=255, db_column="password_hash")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="developer")
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="users", null=True, blank=True)
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
-    date_joined = models.DateTimeField(auto_now_add=True, db_column='created_at')
+    date_joined = models.DateTimeField(auto_now_add=True, db_column="created_at")
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     last_login = models.DateTimeField(null=True, blank=True)
-    timezone = models.CharField(max_length=50, default='UTC')
+    timezone = models.CharField(max_length=50, default="UTC")
 
     username = None
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name"]
 
     objects = RetryableUserManager()
 
     class Meta:
-        ordering = ['-date_joined']
+        ordering = ["-date_joined"]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
 
     def clean(self):
         from django.core.exceptions import ValidationError
+
         if self.email:
             self.email = self.email.lower()
-        
+
         if self.company:
             email_domain = f"@{self.email.split('@')[1]}"
             if self.company.domain != email_domain:
-                raise ValidationError(
-                    f"Email domain must match company domain: {self.company.domain}"
-                )
+                raise ValidationError(f"Email domain must match company domain: {self.company.domain}")
 
     @atomic_with_retry()
     def save(self, *args, **kwargs):
@@ -91,8 +85,8 @@ class User(RetryableModelMixin, AbstractUser):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
-    
-    @property 
+
+    @property
     def created_at(self):
         """Backward compatibility property for created_at"""
         return self.date_joined
@@ -100,7 +94,7 @@ class User(RetryableModelMixin, AbstractUser):
 
 class UserSession(RetryableModelMixin, models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions")
     token_hash = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
@@ -112,12 +106,12 @@ class UserSession(RetryableModelMixin, models.Model):
     objects = RetryableManager()
 
     class Meta:
-        db_table = 'user_sessions'
-        ordering = ['-created_at']
+        db_table = "user_sessions"
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=['user', 'is_active']),
-            models.Index(fields=['token_hash']),
-            models.Index(fields=['expires_at']),
+            models.Index(fields=["user", "is_active"]),
+            models.Index(fields=["token_hash"]),
+            models.Index(fields=["expires_at"]),
         ]
 
     def __str__(self):
@@ -146,11 +140,7 @@ class UserSession(RetryableModelMixin, models.Model):
     @atomic_with_retry()
     def get_active_session(cls, token_hash):
         try:
-            session = cls.objects.get(
-                token_hash=token_hash,
-                is_active=True,
-                expires_at__gt=timezone.now()
-            )
+            session = cls.objects.get(token_hash=token_hash, is_active=True, expires_at__gt=timezone.now())
             session.last_used = timezone.now()
             session.save()
             return session
