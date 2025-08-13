@@ -85,10 +85,11 @@ if DATABASE_URL:
             conn_health_checks=True,
         )
     }
-    # Force auth schema for Railway
-    DATABASES['default']['OPTIONS'] = {
-        'options': '-c search_path=auth'
-    }
+    # Only use auth schema for Railway production environments
+    if not DEBUG and 'test' not in DATABASE_URL:
+        DATABASES['default']['OPTIONS'] = {
+            'options': '-c search_path=auth'
+        }
 else:
     DATABASES = {
         'default': {
@@ -98,11 +99,13 @@ else:
             'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='5432', cast=int),
-            'OPTIONS': {
-                'options': '-c search_path=auth'
-            },
         }
     }
+    # Only use auth schema for production
+    if not DEBUG:
+        DATABASES['default']['OPTIONS'] = {
+            'options': '-c search_path=auth'
+        }
 
 # Database connection configuration for serverless
 DATABASES['default'].update({
