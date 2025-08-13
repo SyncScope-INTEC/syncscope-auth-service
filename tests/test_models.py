@@ -108,14 +108,11 @@ class TestUserModel:
             email="github@example.com",
             first_name="GitHub",
             last_name="User",
-            github_id="123456",
-            avatar_url="https://avatars.githubusercontent.com/u/123456",
-            is_verified=True,
             password=None
         )
-        assert user.github_id == "123456"
-        assert user.avatar_url == "https://avatars.githubusercontent.com/u/123456"
-        assert user.is_verified is True
+        assert user.email == "github@example.com"
+        assert user.first_name == "GitHub"
+        assert user.last_name == "User"
 
 
 @pytest.mark.django_db

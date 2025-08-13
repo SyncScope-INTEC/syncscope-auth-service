@@ -10,6 +10,7 @@ from .views import (
     UserSessionsView
 )
 from .oauth import github_oauth_callback, github_oauth_url
+from .health import health_check, readiness_check, liveness_check
 
 urlpatterns = [
     # Authentication endpoints
@@ -31,4 +32,9 @@ urlpatterns = [
     # OAuth endpoints
     path('github/url/', github_oauth_url, name='github_oauth_url'),
     path('github/callback/', github_oauth_callback, name='github_oauth_callback'),
+    
+    # Health check endpoints
+    path('health/', health_check, name='health_check'),
+    path('health/ready/', readiness_check, name='readiness_check'),
+    path('health/live/', liveness_check, name='liveness_check'),
 ]

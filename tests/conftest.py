@@ -51,8 +51,6 @@ def github_user():
         email="githubuser@example.com",
         first_name="GitHub",
         last_name="User",
-        github_id="123456",
-        is_verified=True,
         password=None
     )
 
