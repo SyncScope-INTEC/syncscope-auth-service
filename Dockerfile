@@ -30,9 +30,6 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
 # Expose port
 EXPOSE 8000
 
@@ -40,5 +37,9 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health/ || exit 1
 
-# Run gunicorn
-CMD ["gunicorn", "--config", "gunicorn.conf.py", "config.wsgi:application"]
+# Create start script that collects static files at runtime
+COPY --chown=appuser:appuser start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Run start script
+CMD ["/app/start.sh"]
