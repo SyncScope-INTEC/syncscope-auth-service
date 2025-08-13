@@ -10,6 +10,8 @@ from django.utils import timezone
 from django.db import transaction
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
+from drf_spectacular.openapi import OpenApiTypes
 from .db_mixins import ServerlessViewMixin
 from config.database_retry import atomic_with_retry
 
@@ -31,6 +33,36 @@ from .utils import (
 )
 
 
+@extend_schema_view(
+    post=extend_schema(
+        tags=['Authentication'],
+        summary='Register a new user',
+        description='Create a new user account with email, password, and basic information.',
+        request=UserRegistrationSerializer,
+        responses={
+            201: OpenApiExample(
+                'Success',
+                value={
+                    'message': 'User registered successfully',
+                    'user': {
+                        'id': 'uuid',
+                        'email': 'user@example.com',
+                        'first_name': 'John',
+                        'last_name': 'Doe',
+                        'role': 'developer',
+                        'company': None
+                    },
+                    'tokens': {
+                        'access': 'jwt_access_token',
+                        'refresh': 'jwt_refresh_token'
+                    },
+                    'session_token': 'session_token'
+                }
+            ),
+            400: 'Bad Request - Validation errors'
+        }
+    )
+)
 @method_decorator(ratelimit(key='ip', rate='5/m', method='POST'), name='post')
 class RegisterView(ServerlessViewMixin, APIView):
     permission_classes = [permissions.AllowAny]

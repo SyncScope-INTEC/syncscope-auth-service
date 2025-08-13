@@ -30,6 +30,7 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'django_extensions',
+    'drf_spectacular',
 ]
 
 LOCAL_APPS = [
@@ -159,6 +160,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT Configuration
@@ -263,4 +265,35 @@ CACHES = {
         'KEY_PREFIX': 'syncscope_auth',
         'TIMEOUT': 300,
     }
+}
+
+# API Documentation (Swagger/OpenAPI)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SyncScope Auth Service API',
+    'DESCRIPTION': 'Authentication and user management service for SyncScope platform',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': True,
+        'defaultModelsExpandDepth': 1,
+        'defaultModelExpandDepth': 1,
+        'defaultModelRendering': 'example',
+        'displayRequestDuration': True,
+        'docExpansion': 'none',
+        'filter': True,
+        'operationsSorter': 'alpha',
+        'showExtensions': True,
+        'tagsSorter': 'alpha',
+        'tryItOutEnabled': True,
+    },
+    'AUTHENTICATION_WHITELIST': [
+        'apps.authentication.views.LoginView',
+        'apps.authentication.views.RegisterView',
+        'apps.authentication.oauth.github_oauth_url',
+        'apps.authentication.oauth.github_oauth_callback',
+    ],
 }
