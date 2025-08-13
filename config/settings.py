@@ -20,6 +20,11 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(","
 # Add Railway health check domain
 if "RAILWAY_ENVIRONMENT" in os.environ:
     ALLOWED_HOSTS.extend(["healthcheck.railway.app", "*.railway.app", "*.up.railway.app"])
+    
+    # Add the specific Railway service domain if provided
+    railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    if railway_public_domain:
+        ALLOWED_HOSTS.append(railway_public_domain)
 
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -49,6 +54,7 @@ MIDDLEWARE = [
     "apps.authentication.middleware.SecurityHeadersMiddleware",
     "apps.authentication.middleware.RequestLoggingMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -153,6 +159,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+
+# WhiteNoise configuration for static files serving
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Ensure Django can find static files during collectstatic
+STATICFILES_DIRS = []
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
