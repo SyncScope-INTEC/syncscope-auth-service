@@ -54,7 +54,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = "."
+source = ["."]
 omit = [
     "*/migrations/*",
     "*/venv/*",
