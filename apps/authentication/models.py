@@ -1,11 +1,14 @@
 import uuid
-from django.contrib.auth.models import AbstractUser
-from django.db import models
-from django.core.validators import EmailValidator
-from django.utils import timezone
 from datetime import timedelta
-from .db_mixins import RetryableModelMixin, RetryableManager, RetryableUserManager
+
+from django.contrib.auth.models import AbstractUser
+from django.core.validators import EmailValidator
+from django.db import models
+from django.utils import timezone
+
 from config.database_retry import atomic_with_retry
+
+from .db_mixins import RetryableManager, RetryableModelMixin, RetryableUserManager
 
 
 class Company(RetryableModelMixin, models.Model):

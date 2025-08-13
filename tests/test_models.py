@@ -1,8 +1,10 @@
-import pytest
-from django.core.exceptions import ValidationError
-from django.contrib.auth import get_user_model
-from django.utils import timezone
 from datetime import timedelta
+
+import pytest
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+
 from apps.authentication.models import Company, UserSession
 
 User = get_user_model()

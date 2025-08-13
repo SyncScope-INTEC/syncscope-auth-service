@@ -2,9 +2,11 @@
 Django management command to check database health for serverless deployments
 """
 
-from django.core.management.base import BaseCommand
-from config.database_retry import DatabaseHealthCheck
 import sys
+
+from django.core.management.base import BaseCommand
+
+from config.database_retry import DatabaseHealthCheck
 
 
 class Command(BaseCommand):

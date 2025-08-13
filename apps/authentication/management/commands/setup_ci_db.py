@@ -2,9 +2,9 @@
 Management command to set up database for CI/test environments
 """
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import connection
-from django.conf import settings
 
 
 class Command(BaseCommand):

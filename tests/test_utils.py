@@ -1,16 +1,18 @@
-import pytest
 from unittest.mock import Mock, patch
-from django.test import RequestFactory
+
+import pytest
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory
+
+from apps.authentication.models import UserSession
 from apps.authentication.utils import (
     create_user_session,
+    get_client_ip,
     get_tokens_for_user,
     hash_token,
-    validate_session_token,
-    get_client_ip,
     invalidate_user_sessions,
+    validate_session_token,
 )
-from apps.authentication.models import UserSession
 
 User = get_user_model()
 

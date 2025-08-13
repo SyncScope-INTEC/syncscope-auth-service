@@ -2,10 +2,12 @@
 Serverless-specific configuration and utilities
 """
 
-import os
 import logging
+import os
 from datetime import timedelta
+
 from django.conf import settings
+
 from config.database_retry import configure_connection_pool
 
 logger = logging.getLogger(__name__)
@@ -75,8 +77,8 @@ def validate_serverless_config():
 
 def get_serverless_metrics():
     """Get metrics useful for serverless monitoring"""
-    from django.db import connection
     from django.core.cache import cache
+    from django.db import connection
 
     metrics = {
         "database_queries": len(connection.queries),

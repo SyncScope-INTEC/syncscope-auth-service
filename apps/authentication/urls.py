@@ -1,16 +1,17 @@
 from django.urls import path
+
+from .health import health_check, liveness_check, readiness_check
+from .oauth import github_oauth_callback, github_oauth_url
 from .views import (
-    RegisterView,
+    ChangePasswordView,
+    CustomTokenRefreshView,
     LoginView,
     LogoutView,
     ProfileView,
-    ChangePasswordView,
-    CustomTokenRefreshView,
-    verify_token,
+    RegisterView,
     UserSessionsView,
+    verify_token,
 )
-from .oauth import github_oauth_callback, github_oauth_url
-from .health import health_check, readiness_check, liveness_check
 
 urlpatterns = [
     # Authentication endpoints

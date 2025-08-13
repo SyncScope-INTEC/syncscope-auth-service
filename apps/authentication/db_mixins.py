@@ -2,9 +2,10 @@
 Database mixins with retry logic for models and views
 """
 
-from django.db import models
 from django.contrib.auth.models import BaseUserManager
-from config.database_retry import database_retry, RetryableQuerySet, atomic_with_retry
+from django.db import models
+
+from config.database_retry import RetryableQuerySet, atomic_with_retry, database_retry
 
 
 class RetryableModelMixin:
@@ -142,8 +143,8 @@ class ServerlessViewMixin:
 
             # Try one more time after closing connections
             if not DatabaseHealthCheck.is_healthy(use_cache=False):
-                from rest_framework.response import Response
                 from rest_framework import status
+                from rest_framework.response import Response
 
                 return Response(
                     {"error": "Service temporarily unavailable", "detail": "Database connection issue"},
@@ -153,7 +154,7 @@ class ServerlessViewMixin:
         return super().dispatch(request, *args, **kwargs)
 
     def handle_exception(self, exc):
-        from config.database_retry import is_retryable_error, DatabaseHealthCheck
+        from config.database_retry import DatabaseHealthCheck, is_retryable_error
 
         if is_retryable_error(exc):
             DatabaseHealthCheck.mark_unhealthy()

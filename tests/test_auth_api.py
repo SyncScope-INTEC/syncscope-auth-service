@@ -1,8 +1,9 @@
 import pytest
-from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+
 from apps.authentication.models import Company, UserSession
 
 User = get_user_model()

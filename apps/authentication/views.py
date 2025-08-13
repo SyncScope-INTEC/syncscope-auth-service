@@ -1,30 +1,31 @@
-from rest_framework import status, permissions
+from django.contrib.auth import authenticate
+from django.db import transaction
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
+from drf_spectacular.openapi import OpenApiTypes
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, extend_schema_view
+from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
-from django.contrib.auth import authenticate
-from django.utils import timezone
-from django.db import transaction
-from django_ratelimit.decorators import ratelimit
-from django.utils.decorators import method_decorator
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
-from drf_spectacular.openapi import OpenApiTypes
-from .db_mixins import ServerlessViewMixin
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
 from config.database_retry import atomic_with_retry
 
+from .db_mixins import ServerlessViewMixin
 from .models import User, UserSession
 from .serializers import (
-    UserRegistrationSerializer,
+    PasswordChangeSerializer,
     UserLoginSerializer,
     UserProfileSerializer,
-    UserUpdateSerializer,
-    PasswordChangeSerializer,
+    UserRegistrationSerializer,
     UserSessionSerializer,
+    UserUpdateSerializer,
 )
-from .utils import create_user_session, get_tokens_for_user, invalidate_user_sessions, validate_session_token, get_client_ip
+from .utils import create_user_session, get_client_ip, get_tokens_for_user, invalidate_user_sessions, validate_session_token
 
 
 @extend_schema_view(

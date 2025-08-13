@@ -7,9 +7,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .models import User, Company
+from .models import Company, User
 from .serializers import UserProfileSerializer
-from .utils import create_user_session, get_tokens_for_user, extract_domain_from_email
+from .utils import create_user_session, extract_domain_from_email, get_tokens_for_user
 
 
 def exchange_code_for_token(code):

@@ -1,9 +1,11 @@
-import pytest
 from unittest.mock import Mock, patch
-from django.test import RequestFactory
-from django.http import HttpResponse
+
+import pytest
 from django.contrib.auth import get_user_model
-from apps.authentication.middleware import SecurityHeadersMiddleware, RequestLoggingMiddleware, RateLimitMiddleware
+from django.http import HttpResponse
+from django.test import RequestFactory
+
+from apps.authentication.middleware import RateLimitMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
 
 User = get_user_model()
 

@@ -5,16 +5,18 @@ Can be used as a standalone script or imported
 """
 import os
 import sys
+from datetime import datetime
+
 import django
 import requests
-from datetime import datetime
 
 # Setup Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
-from config.database_retry import DatabaseHealthCheck
 from django.conf import settings
+
+from config.database_retry import DatabaseHealthCheck
 
 
 def check_database():

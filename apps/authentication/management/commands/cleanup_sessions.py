@@ -4,6 +4,7 @@ Django management command to cleanup expired sessions
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+
 from apps.authentication.models import UserSession
 from config.database_retry import database_retry
 

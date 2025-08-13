@@ -2,13 +2,14 @@
 Database retry and resilience utilities for serverless environments
 """
 
-import time
 import logging
+import time
 from functools import wraps
-from django.db import connection, transaction
-from django.db.utils import OperationalError, InterfaceError, DatabaseError
-from django.core.cache import cache
+
 import psycopg2
+from django.core.cache import cache
+from django.db import connection, transaction
+from django.db.utils import DatabaseError, InterfaceError, OperationalError
 
 logger = logging.getLogger(__name__)
 

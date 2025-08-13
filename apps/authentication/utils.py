@@ -1,9 +1,11 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta
+
 from django.conf import settings
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
+
 from .models import UserSession
 
 

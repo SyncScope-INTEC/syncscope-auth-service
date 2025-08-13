@@ -1,9 +1,10 @@
-import time
 import logging
-from django.http import JsonResponse
-from django.core.cache import cache
-from django.utils.deprecation import MiddlewareMixin
+import time
+
 from django.conf import settings
+from django.core.cache import cache
+from django.http import JsonResponse
+from django.utils.deprecation import MiddlewareMixin
 
 logger = logging.getLogger(__name__)
 
