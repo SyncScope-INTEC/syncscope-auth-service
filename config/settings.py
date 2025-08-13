@@ -52,16 +52,6 @@ MIDDLEWARE = [
     'apps.authentication.middleware.RateLimitMiddleware',
 ]
 
-# Database connection configuration for serverless
-DATABASES['default'].update({
-    'CONN_MAX_AGE': 0,  # Don't persist connections in serverless
-    'CONN_HEALTH_CHECKS': True,
-    'OPTIONS': {
-        'connect_timeout': 10,
-        'application_name': 'syncscope-auth-serverless',
-        'options': '-c search_path=auth -c statement_timeout=30000',
-    }
-})
 
 ROOT_URLCONF = 'config.urls'
 
@@ -112,6 +102,17 @@ else:
             },
         }
     }
+
+# Database connection configuration for serverless
+DATABASES['default'].update({
+    'CONN_MAX_AGE': 0,  # Don't persist connections in serverless
+    'CONN_HEALTH_CHECKS': True,
+    'OPTIONS': {
+        'connect_timeout': 10,
+        'application_name': 'syncscope-auth-serverless',
+        'options': '-c search_path=auth -c statement_timeout=30000',
+    }
+})
 
 # Custom User Model
 AUTH_USER_MODEL = 'authentication.User'

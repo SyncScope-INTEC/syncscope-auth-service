@@ -14,19 +14,18 @@ class CompanyAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['email', 'first_name', 'last_name', 'role', 'company', 'is_active', 'is_verified']
-    list_filter = ['role', 'is_active', 'is_verified', 'is_staff', 'company', 'created_at']
+    list_display = ['email', 'first_name', 'last_name', 'role', 'company', 'is_active']
+    list_filter = ['role', 'is_active', 'is_staff', 'company', 'date_joined']
     search_fields = ['email', 'first_name', 'last_name']
-    readonly_fields = ['id', 'created_at', 'updated_at', 'last_login', 'date_joined']
-    ordering = ['-created_at']
+    readonly_fields = ['id', 'date_joined', 'updated_at', 'last_login']
+    ordering = ['-date_joined']
     
     fieldsets = (
         (None, {'fields': ('id', 'email', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'avatar_url')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'timezone')}),
         ('Company info', {'fields': ('company', 'role')}),
-        ('GitHub info', {'fields': ('github_id',)}),
-        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_verified', 'groups', 'user_permissions')}),
-        ('Important dates', {'fields': ('last_login', 'date_joined', 'created_at', 'updated_at')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Important dates', {'fields': ('last_login', 'date_joined', 'updated_at')}),
     )
     
     add_fieldsets = (

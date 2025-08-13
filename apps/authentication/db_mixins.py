@@ -2,6 +2,7 @@
 Database mixins with retry logic for models and views
 """
 from django.db import models
+from django.contrib.auth.models import BaseUserManager
 from config.database_retry import database_retry, RetryableQuerySet, atomic_with_retry
 
 
@@ -75,6 +76,57 @@ class RetryableManager(models.Manager):
     @database_retry()
     def count(self):
         return super().count()
+
+
+class RetryableUserManager(BaseUserManager):
+    """Custom user manager with retry logic for User models"""
+    
+    @database_retry()
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
+    
+    @database_retry()
+    def filter(self, *args, **kwargs):
+        return super().filter(*args, **kwargs)
+    
+    @database_retry()
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        
+        # Remove any fields that don't exist in the model
+        extra_fields.pop('is_verified', None)
+        extra_fields.pop('github_id', None)
+        extra_fields.pop('avatar_url', None)
+        
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+    
+    @database_retry()
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        
+        # Remove any fields that don't exist in the model
+        extra_fields.pop('is_verified', None)
+        
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        
+        return self.create_user(email, password, **extra_fields)
+    
+    @database_retry()
+    def get_or_create(self, *args, **kwargs):
+        return super().get_or_create(*args, **kwargs)
+    
+    @database_retry()
+    def update_or_create(self, *args, **kwargs):
+        return super().update_or_create(*args, **kwargs)
 
 
 class ServerlessViewMixin:
