@@ -85,11 +85,6 @@ if DATABASE_URL:
             conn_health_checks=True,
         )
     }
-    # Only use auth schema for Railway production environments
-    if not DEBUG and 'test' not in DATABASE_URL:
-        DATABASES['default']['OPTIONS'] = {
-            'options': '-c search_path=auth'
-        }
 else:
     DATABASES = {
         'default': {
@@ -101,21 +96,30 @@ else:
             'PORT': config('DB_PORT', default='5432', cast=int),
         }
     }
-    # Only use auth schema for production
-    if not DEBUG:
-        DATABASES['default']['OPTIONS'] = {
-            'options': '-c search_path=auth'
-        }
 
 # Database connection configuration for serverless
+db_options = {
+    'connect_timeout': 10,
+    'application_name': 'syncscope-auth-serverless',
+}
+
+# Only use auth schema in production environments
+# For test environments (CI/CD), use the default public schema
+use_auth_schema = (
+    not DEBUG and 
+    'test' not in config('DB_NAME', default='').lower() and
+    'test' not in os.environ.get('DATABASE_URL', '').lower()
+)
+
+if use_auth_schema:
+    db_options['options'] = '-c search_path=auth -c statement_timeout=30000'
+else:
+    db_options['options'] = '-c statement_timeout=30000'
+
 DATABASES['default'].update({
     'CONN_MAX_AGE': 0,  # Don't persist connections in serverless
     'CONN_HEALTH_CHECKS': True,
-    'OPTIONS': {
-        'connect_timeout': 10,
-        'application_name': 'syncscope-auth-serverless',
-        'options': '-c search_path=auth -c statement_timeout=30000',
-    }
+    'OPTIONS': db_options
 })
 
 # Custom User Model
