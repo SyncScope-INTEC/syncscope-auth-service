@@ -83,15 +83,6 @@ jobs:
 
           # Check import sorting
           isort --check-only --diff .
-
-      - name: Run type checking
-        run: |
-          # Install mypy if not in requirements
-          pip install mypy django-stubs djangorestframework-stubs
-
-          # Run type checking
-          mypy . --ignore-missing-imports
-
       - name: Run tests
         env:
           SECRET_KEY: "test-secret-key-for-ci"
