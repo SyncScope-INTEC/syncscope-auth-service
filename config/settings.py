@@ -20,7 +20,7 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(","
 # Add Railway health check domain
 if "RAILWAY_ENVIRONMENT" in os.environ:
     ALLOWED_HOSTS.extend(["healthcheck.railway.app", "*.railway.app", "*.up.railway.app"])
-    
+
     # Add the specific Railway service domain if provided
     railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
     if railway_public_domain:
