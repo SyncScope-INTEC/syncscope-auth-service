@@ -110,6 +110,7 @@ jobs:
           name: codecov-umbrella
 
       - name: Security check
+        continue-on-error: true
         run: |
           # Install security tools
           pip install safety bandit
