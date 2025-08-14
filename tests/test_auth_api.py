@@ -31,11 +31,24 @@ class TestAuthenticationAPI:
         assert "session_token" in response.data
         assert response.data["user"]["email"] == "newuser@testcompany.com"
 
-        # Check user was created
+        # Check user was created with all expected fields
         user = User.objects.get(email="newuser@testcompany.com")
         assert user.first_name == "New"
         assert user.last_name == "User"
         assert user.company.name == "Test Company"
+        assert user.role == "developer"  # Default role
+        assert user.timezone == "UTC"  # Default timezone
+        assert user.is_active is True
+        assert user.is_staff is False
+        assert user.is_superuser is False
+        assert user.date_joined is not None
+        assert user.updated_at is not None
+        
+        # Check company was created with proper domain
+        company = user.company
+        assert company.domain == "@testcompany.com"
+        assert company.created_at is not None
+        assert company.updated_at is not None
 
     def test_user_registration_password_mismatch(self, api_client):
         url = reverse("register")
@@ -79,6 +92,22 @@ class TestAuthenticationAPI:
         assert "tokens" in response.data
         assert "session_token" in response.data
         assert response.data["user"]["email"] == user.email
+        
+        # Check that a user session was created
+        session_token = response.data["session_token"]
+        assert session_token is not None
+        
+        # Verify session exists in database
+        user_sessions = UserSession.objects.filter(user=user, is_active=True)
+        assert user_sessions.exists()
+        
+        # Check user fields in response
+        user_data = response.data["user"]
+        assert user_data["first_name"] == user.first_name
+        assert user_data["last_name"] == user.last_name
+        assert user_data["role"] == user.role
+        assert user_data["timezone"] == user.timezone
+        assert user_data["is_active"] == user.is_active
 
     def test_user_login_invalid_credentials(self, api_client, user):
         url = reverse("login")
@@ -120,21 +149,81 @@ class TestAuthenticationAPI:
         assert response.data["first_name"] == user.first_name
         assert response.data["last_name"] == user.last_name
         assert response.data["role"] == user.role
+        assert response.data["timezone"] == user.timezone
+        assert response.data["is_active"] == user.is_active
+        
+        # Check additional profile fields
+        assert "date_joined" in response.data or "created_at" in response.data
+        assert "updated_at" in response.data
+        
+        # Check company information if user has a company
+        if user.company:
+            assert "company" in response.data
+            company_data = response.data["company"]
+            assert company_data["name"] == user.company.name
+            assert company_data["domain"] == user.company.domain
 
     def test_update_profile(self, authenticated_client, user):
         url = reverse("profile")
-        data = {"first_name": "Updated", "last_name": "Name"}
+        data = {
+            "first_name": "Updated", 
+            "last_name": "Name",
+            "timezone": "America/New_York"
+        }
 
         response = authenticated_client.put(url, data)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["first_name"] == "Updated"
         assert response.data["last_name"] == "Name"
-
-        # Check user was updated
+        
+        # Check user was updated in database
         user.refresh_from_db()
         assert user.first_name == "Updated"
         assert user.last_name == "Name"
+        
+        # Check timezone update if supported
+        if "timezone" in response.data:
+            assert response.data["timezone"] == "America/New_York"
+            assert user.timezone == "America/New_York"
+        
+        # Check that updated_at timestamp was changed
+        assert user.updated_at is not None
+
+    def test_update_profile_partial(self, authenticated_client, user):
+        original_last_name = user.last_name
+        url = reverse("profile")
+        data = {"first_name": "PartialUpdate"}
+
+        response = authenticated_client.put(url, data)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["first_name"] == "PartialUpdate"
+        
+        # Check that unchanged fields remain the same
+        user.refresh_from_db()
+        assert user.first_name == "PartialUpdate"
+        assert user.last_name == original_last_name
+
+    def test_profile_readonly_fields(self, authenticated_client, user):
+        original_email = user.email
+        original_role = user.role
+        
+        url = reverse("profile")
+        data = {
+            "first_name": "Updated",
+            "email": "newemail@testcompany.com",  # Should not be updatable
+            "role": "admin",  # Should not be updatable
+            "is_staff": True,  # Should not be updatable
+        }
+
+        response = authenticated_client.put(url, data)
+
+        # Even if the request succeeds, sensitive fields should not change
+        user.refresh_from_db()
+        assert user.email == original_email
+        assert user.role == original_role
+        assert user.is_staff is False  # Should remain unchanged
 
     def test_change_password(self, authenticated_client, user):
         url = reverse("change_password")
@@ -243,7 +332,15 @@ class TestSessionAPI:
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
-        assert any(s["id"] == str(session.id) for s in response.data)
+        
+        # Find our specific session in the response
+        session_data = next((s for s in response.data if s["id"] == str(session.id)), None)
+        assert session_data is not None
+        assert session_data["is_active"] is True
+        assert session_data["user_agent"] is not None
+        assert "created_at" in session_data
+        assert "last_used" in session_data
+        assert "expires_at" in session_data
 
     def test_terminate_specific_session(self, authenticated_client, user, user_session):
         session, token = user_session
@@ -261,6 +358,13 @@ class TestSessionAPI:
         assert session.is_active is False
 
     def test_terminate_all_sessions(self, authenticated_client, user):
+        # Create multiple sessions for the user
+        UserSession.objects.create(user=user, token_hash="session1_hash")
+        UserSession.objects.create(user=user, token_hash="session2_hash")
+        
+        initial_active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
+        assert initial_active_sessions >= 2
+
         url = reverse("user_sessions")
         data = {}
 
@@ -268,6 +372,37 @@ class TestSessionAPI:
 
         assert response.status_code == status.HTTP_200_OK
         assert "All sessions terminated" in response.data["message"]
+        
+        # Check all sessions were deactivated
+        active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
+        assert active_sessions == 0
+
+    def test_session_details_in_response(self, authenticated_client, user):
+        # Create a session with specific details
+        from apps.authentication.utils import hash_token
+        
+        session = UserSession.objects.create(
+            user=user,
+            token_hash=hash_token("test_token"),
+            user_agent="Mozilla/5.0 Test Browser",
+            ip_address="192.168.1.100"
+        )
+
+        url = reverse("user_sessions")
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        
+        session_data = next((s for s in response.data if s["id"] == str(session.id)), None)
+        assert session_data is not None
+        
+        # Check that sensitive information is not exposed
+        assert "token_hash" not in session_data
+        
+        # Check that appropriate fields are included
+        expected_fields = ["id", "created_at", "last_used", "expires_at", "is_active", "user_agent"]
+        for field in expected_fields:
+            assert field in session_data
 
 
 @pytest.mark.django_db
