@@ -85,7 +85,8 @@ class RetryableUserManager(BaseUserManager):
 
     def get_queryset(self):
         """Return the base queryset for this manager"""
-        return RetryableQuerySet(self.model, using=self._db)
+        from django.db.models import QuerySet
+        return QuerySet(self.model, using=self._db)
 
     @database_retry()
     def get(self, *args, **kwargs):
