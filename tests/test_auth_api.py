@@ -43,7 +43,7 @@ class TestAuthenticationAPI:
         assert user.is_superuser is False
         assert user.date_joined is not None
         assert user.updated_at is not None
-        
+
         # Check company was created with proper domain
         company = user.company
         assert company.domain == "@testcompany.com"
@@ -92,15 +92,15 @@ class TestAuthenticationAPI:
         assert "tokens" in response.data
         assert "session_token" in response.data
         assert response.data["user"]["email"] == user.email
-        
+
         # Check that a user session was created
         session_token = response.data["session_token"]
         assert session_token is not None
-        
+
         # Verify session exists in database
         user_sessions = UserSession.objects.filter(user=user, is_active=True)
         assert user_sessions.exists()
-        
+
         # Check user fields in response
         user_data = response.data["user"]
         assert user_data["first_name"] == user.first_name
@@ -151,11 +151,11 @@ class TestAuthenticationAPI:
         assert response.data["role"] == user.role
         assert response.data["timezone"] == user.timezone
         assert response.data["is_active"] == user.is_active
-        
+
         # Check additional profile fields
         assert "date_joined" in response.data or "created_at" in response.data
         assert "updated_at" in response.data
-        
+
         # Check company information if user has a company
         if user.company:
             assert "company" in response.data
@@ -165,28 +165,24 @@ class TestAuthenticationAPI:
 
     def test_update_profile(self, authenticated_client, user):
         url = reverse("profile")
-        data = {
-            "first_name": "Updated", 
-            "last_name": "Name",
-            "timezone": "America/New_York"
-        }
+        data = {"first_name": "Updated", "last_name": "Name", "timezone": "America/New_York"}
 
         response = authenticated_client.put(url, data)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["first_name"] == "Updated"
         assert response.data["last_name"] == "Name"
-        
+
         # Check user was updated in database
         user.refresh_from_db()
         assert user.first_name == "Updated"
         assert user.last_name == "Name"
-        
+
         # Check timezone update if supported
         if "timezone" in response.data:
             assert response.data["timezone"] == "America/New_York"
             assert user.timezone == "America/New_York"
-        
+
         # Check that updated_at timestamp was changed
         assert user.updated_at is not None
 
@@ -199,7 +195,7 @@ class TestAuthenticationAPI:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["first_name"] == "PartialUpdate"
-        
+
         # Check that unchanged fields remain the same
         user.refresh_from_db()
         assert user.first_name == "PartialUpdate"
@@ -208,7 +204,7 @@ class TestAuthenticationAPI:
     def test_profile_readonly_fields(self, authenticated_client, user):
         original_email = user.email
         original_role = user.role
-        
+
         url = reverse("profile")
         data = {
             "first_name": "Updated",
@@ -332,7 +328,7 @@ class TestSessionAPI:
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
-        
+
         # Find our specific session in the response
         session_data = next((s for s in response.data if s["id"] == str(session.id)), None)
         assert session_data is not None
@@ -361,7 +357,7 @@ class TestSessionAPI:
         # Create multiple sessions for the user
         UserSession.objects.create(user=user, token_hash="session1_hash")
         UserSession.objects.create(user=user, token_hash="session2_hash")
-        
+
         initial_active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
         assert initial_active_sessions >= 2
 
@@ -372,7 +368,7 @@ class TestSessionAPI:
 
         assert response.status_code == status.HTTP_200_OK
         assert "All sessions terminated" in response.data["message"]
-        
+
         # Check all sessions were deactivated
         active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
         assert active_sessions == 0
@@ -380,25 +376,22 @@ class TestSessionAPI:
     def test_session_details_in_response(self, authenticated_client, user):
         # Create a session with specific details
         from apps.authentication.utils import hash_token
-        
+
         session = UserSession.objects.create(
-            user=user,
-            token_hash=hash_token("test_token"),
-            user_agent="Mozilla/5.0 Test Browser",
-            ip_address="192.168.1.100"
+            user=user, token_hash=hash_token("test_token"), user_agent="Mozilla/5.0 Test Browser", ip_address="192.168.1.100"
         )
 
         url = reverse("user_sessions")
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
-        
+
         session_data = next((s for s in response.data if s["id"] == str(session.id)), None)
         assert session_data is not None
-        
+
         # Check that sensitive information is not exposed
         assert "token_hash" not in session_data
-        
+
         # Check that appropriate fields are included
         expected_fields = ["id", "created_at", "last_used", "expires_at", "is_active", "user_agent"]
         for field in expected_fields:

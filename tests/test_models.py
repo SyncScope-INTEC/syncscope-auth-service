@@ -42,13 +42,14 @@ class TestCompanyModel:
 
     def test_company_timestamps_auto_update(self):
         import time
+
         company = Company.objects.create(name="Test Company", domain="@testcompany.com")
         original_updated_at = company.updated_at
-        
+
         time.sleep(0.01)
         company.name = "Updated Company"
         company.save()
-        
+
         assert company.updated_at > original_updated_at
 
 
@@ -57,11 +58,7 @@ class TestUserModel:
 
     def test_create_user(self, company):
         user = User.objects.create_user(
-            email="test@testcompany.com", 
-            password="testpassword123", 
-            first_name="Test", 
-            last_name="User", 
-            company=company
+            email="test@testcompany.com", password="testpassword123", first_name="Test", last_name="User", company=company
         )
         assert user.email == "test@testcompany.com"
         assert user.first_name == "Test"
@@ -78,51 +75,30 @@ class TestUserModel:
 
     def test_user_str_representation(self, company):
         user = User.objects.create_user(
-            email="test@testcompany.com", 
-            password="testpassword123", 
-            first_name="Test", 
-            last_name="User", 
-            company=company
+            email="test@testcompany.com", password="testpassword123", first_name="Test", last_name="User", company=company
         )
         assert str(user) == "Test User (test@testcompany.com)"
 
     def test_full_name_property(self, company):
         user = User.objects.create_user(
-            email="test@testcompany.com", 
-            password="testpassword123", 
-            first_name="Test", 
-            last_name="User", 
-            company=company
+            email="test@testcompany.com", password="testpassword123", first_name="Test", last_name="User", company=company
         )
         assert user.full_name == "Test User"
 
     def test_created_at_property(self, company):
         user = User.objects.create_user(
-            email="test@testcompany.com", 
-            password="testpassword123", 
-            first_name="Test", 
-            last_name="User", 
-            company=company
+            email="test@testcompany.com", password="testpassword123", first_name="Test", last_name="User", company=company
         )
         assert user.created_at == user.date_joined
 
     def test_email_domain_validation(self, company):
         with pytest.raises(ValidationError):
-            user = User(
-                email="test@wrongdomain.com", 
-                first_name="Test", 
-                last_name="User", 
-                company=company
-            )
+            user = User(email="test@wrongdomain.com", first_name="Test", last_name="User", company=company)
             user.clean()
 
     def test_email_case_normalization(self, company):
         user = User.objects.create_user(
-            email="TEST@TESTCOMPANY.COM", 
-            password="testpassword123", 
-            first_name="Test", 
-            last_name="User", 
-            company=company
+            email="TEST@TESTCOMPANY.COM", password="testpassword123", first_name="Test", last_name="User", company=company
         )
         assert user.email == "test@testcompany.com"
 
@@ -136,7 +112,7 @@ class TestUserModel:
             company=company,
         )
         assert admin_user.role == "admin"
-        
+
         developer_user = User.objects.create_user(
             email="dev@testcompany.com",
             password="testpassword123",
@@ -146,7 +122,7 @@ class TestUserModel:
             company=company,
         )
         assert developer_user.role == "developer"
-        
+
         manager_user = User.objects.create_user(
             email="manager@testcompany.com",
             password="testpassword123",
@@ -176,6 +152,7 @@ class TestUserModel:
 
     def test_user_timestamps_auto_update(self, company):
         import time
+
         user = User.objects.create_user(
             email="test@testcompany.com",
             password="testpassword123",
@@ -184,20 +161,15 @@ class TestUserModel:
             company=company,
         )
         original_updated_at = user.updated_at
-        
+
         time.sleep(0.01)
         user.first_name = "Updated"
         user.save()
-        
+
         assert user.updated_at > original_updated_at
 
     def test_github_user_creation(self):
-        user = User.objects.create_user(
-            email="github@example.com", 
-            first_name="GitHub", 
-            last_name="User", 
-            password=None
-        )
+        user = User.objects.create_user(email="github@example.com", first_name="GitHub", last_name="User", password=None)
         assert user.email == "github@example.com"
         assert user.first_name == "GitHub"
         assert user.last_name == "User"
@@ -237,7 +209,7 @@ class TestUserModel:
         )
         assert staff_user.is_staff is True
         assert staff_user.is_superuser is False
-        
+
         super_user = User.objects.create_user(
             email="super@testcompany.com",
             password="testpassword123",
@@ -261,10 +233,7 @@ class TestUserSessionModel:
         token_hash = hash_token(token)
 
         session = UserSession.objects.create(
-            user=user, 
-            token_hash=token_hash, 
-            user_agent="Test User Agent", 
-            ip_address="127.0.0.1"
+            user=user, token_hash=token_hash, user_agent="Test User Agent", ip_address="127.0.0.1"
         )
 
         assert session.user == user
@@ -290,17 +259,13 @@ class TestUserSessionModel:
     def test_is_expired_method(self, user):
         # Create expired session
         expired_session = UserSession.objects.create(
-            user=user, 
-            token_hash="expired_hash", 
-            expires_at=timezone.now() - timedelta(hours=1)
+            user=user, token_hash="expired_hash", expires_at=timezone.now() - timedelta(hours=1)
         )
         assert expired_session.is_expired() is True
 
         # Create valid session
         valid_session = UserSession.objects.create(
-            user=user, 
-            token_hash="valid_hash", 
-            expires_at=timezone.now() + timedelta(hours=1)
+            user=user, token_hash="valid_hash", expires_at=timezone.now() + timedelta(hours=1)
         )
         assert valid_session.is_expired() is False
 
@@ -319,15 +284,12 @@ class TestUserSessionModel:
         token_hash = hash_token(token)
 
         # Create active session
-        session = UserSession.objects.create(
-            user=user, 
-            token_hash=token_hash, 
-            expires_at=timezone.now() + timedelta(hours=1)
-        )
+        session = UserSession.objects.create(user=user, token_hash=token_hash, expires_at=timezone.now() + timedelta(hours=1))
         original_last_used = session.last_used
 
         # Small delay to ensure last_used gets updated
         import time
+
         time.sleep(0.01)
 
         retrieved_session = UserSession.get_active_session(token_hash)
@@ -345,17 +307,11 @@ class TestUserSessionModel:
 
     def test_cleanup_expired_sessions(self, user):
         # Create expired session
-        UserSession.objects.create(
-            user=user, 
-            token_hash="expired_hash", 
-            expires_at=timezone.now() - timedelta(hours=1)
-        )
+        UserSession.objects.create(user=user, token_hash="expired_hash", expires_at=timezone.now() - timedelta(hours=1))
 
         # Create valid session
         valid_session = UserSession.objects.create(
-            user=user, 
-            token_hash="valid_hash", 
-            expires_at=timezone.now() + timedelta(hours=1)
+            user=user, token_hash="valid_hash", expires_at=timezone.now() + timedelta(hours=1)
         )
 
         assert UserSession.objects.count() == 2
@@ -372,60 +328,41 @@ class TestUserSessionModel:
 
     def test_session_ip_address_types(self, user):
         # Test IPv4
-        ipv4_session = UserSession.objects.create(
-            user=user, 
-            token_hash="ipv4_hash", 
-            ip_address="192.168.1.1"
-        )
+        ipv4_session = UserSession.objects.create(user=user, token_hash="ipv4_hash", ip_address="192.168.1.1")
         assert str(ipv4_session.ip_address) == "192.168.1.1"
 
         # Test IPv6
-        ipv6_session = UserSession.objects.create(
-            user=user, 
-            token_hash="ipv6_hash", 
-            ip_address="2001:db8::1"
-        )
+        ipv6_session = UserSession.objects.create(user=user, token_hash="ipv6_hash", ip_address="2001:db8::1")
         assert str(ipv6_session.ip_address) == "2001:db8::1"
 
         # Test null IP address
-        null_ip_session = UserSession.objects.create(
-            user=user, 
-            token_hash="null_ip_hash", 
-            ip_address=None
-        )
+        null_ip_session = UserSession.objects.create(user=user, token_hash="null_ip_hash", ip_address=None)
         assert null_ip_session.ip_address is None
 
     def test_session_user_agent_field(self, user):
         long_user_agent = "A" * 1000  # Test long user agent string
-        session = UserSession.objects.create(
-            user=user,
-            token_hash="ua_test_hash",
-            user_agent=long_user_agent
-        )
+        session = UserSession.objects.create(user=user, token_hash="ua_test_hash", user_agent=long_user_agent)
         assert session.user_agent == long_user_agent
 
         # Test empty user agent
-        empty_ua_session = UserSession.objects.create(
-            user=user,
-            token_hash="empty_ua_hash",
-            user_agent=""
-        )
+        empty_ua_session = UserSession.objects.create(user=user, token_hash="empty_ua_hash", user_agent="")
         assert empty_ua_session.user_agent == ""
 
     def test_session_last_used_auto_update(self, user):
         session = UserSession.objects.create(user=user, token_hash="test_hash")
         original_last_used = session.last_used
-        
+
         import time
+
         time.sleep(0.01)
-        
+
         session.save()
         assert session.last_used > original_last_used
 
     def test_multiple_sessions_per_user(self, user):
         session1 = UserSession.objects.create(user=user, token_hash="hash1")
         session2 = UserSession.objects.create(user=user, token_hash="hash2")
-        
+
         user_sessions = UserSession.objects.filter(user=user)
         assert user_sessions.count() == 2
         assert session1 in user_sessions

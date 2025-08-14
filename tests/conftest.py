@@ -15,10 +15,7 @@ def api_client():
 
 @pytest.fixture
 def company():
-    return Company.objects.create(
-        name="Test Company", 
-        domain="@testcompany.com"
-    )
+    return Company.objects.create(name="Test Company", domain="@testcompany.com")
 
 
 @pytest.fixture
@@ -56,9 +53,9 @@ def admin_user(company):
 @pytest.fixture
 def github_user():
     return User.objects.create_user(
-        email="githubuser@example.com", 
-        first_name="GitHub", 
-        last_name="User", 
+        email="githubuser@example.com",
+        first_name="GitHub",
+        last_name="User",
         password=None,
         role="developer",
         timezone="UTC",
