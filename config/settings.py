@@ -208,6 +208,9 @@ CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:
 
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000").split(",")
+
 # OAuth Settings
 GITHUB_CLIENT_ID = config("GITHUB_CLIENT_ID", default=None)
 GITHUB_CLIENT_SECRET = config("GITHUB_CLIENT_SECRET", default=None)
