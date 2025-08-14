@@ -83,6 +83,10 @@ class RetryableManager(models.Manager):
 class RetryableUserManager(BaseUserManager):
     """Custom user manager with retry logic for User models"""
 
+    def get_queryset(self):
+        """Return the base queryset for this manager"""
+        return RetryableQuerySet(self.model, using=self._db)
+
     @database_retry()
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)

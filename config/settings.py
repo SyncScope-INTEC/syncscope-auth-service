@@ -114,8 +114,9 @@ db_options = {
     "application_name": "syncscope-auth-serverless",
 }
 
-# Only use auth schema in production environments
-# For test environments (CI/CD), use the default public schema
+# Schema configuration
+# For Railway production, we need to include both public and auth schemas
+# Django admin needs access to both schemas
 use_auth_schema = (
     not DEBUG
     and "test" not in config("DB_NAME", default="").lower()
@@ -123,7 +124,8 @@ use_auth_schema = (
 )
 
 if use_auth_schema:
-    db_options["options"] = "-c search_path=auth -c statement_timeout=30000"
+    # Include both public and auth schemas for Django admin compatibility
+    db_options["options"] = "-c search_path=public,auth -c statement_timeout=30000"
 else:
     db_options["options"] = "-c statement_timeout=30000"
 

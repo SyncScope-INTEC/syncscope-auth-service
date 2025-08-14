@@ -64,6 +64,7 @@ class User(RetryableModelMixin, AbstractUser):
     objects = RetryableUserManager()
 
     class Meta:
+        db_table = "authentication_user"
         ordering = ["-date_joined"]
 
     def __str__(self):
