@@ -115,17 +115,16 @@ db_options = {
 }
 
 # Schema configuration
-# For Railway production, we need to include both public and auth schemas
+# This auth service should always use the auth schema
 # Django admin needs access to both schemas
 use_auth_schema = (
-    not DEBUG
-    and "test" not in config("DB_NAME", default="").lower()
+    "test" not in config("DB_NAME", default="").lower()
     and "test" not in os.environ.get("DATABASE_URL", "").lower()
 )
 
 if use_auth_schema:
-    # Include both public and auth schemas for Django admin compatibility
-    db_options["options"] = "-c search_path=public,auth -c statement_timeout=30000"
+    # Prioritize auth schema over public schema
+    db_options["options"] = "-c search_path=auth,public -c statement_timeout=30000"
 else:
     db_options["options"] = "-c statement_timeout=30000"
 
