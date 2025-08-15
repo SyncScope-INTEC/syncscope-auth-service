@@ -1,19 +1,19 @@
-from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
 
 User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Debug user authentication issues'
+    help = "Debug user authentication issues"
 
     def handle(self, *args, **options):
         self.stdout.write("Debugging user authentication...")
-        
+
         # Check total users
         total_users = User.objects.count()
         self.stdout.write(f"Total users in database: {total_users}")
-        
+
         # List all users
         self.stdout.write("\nAll users:")
         for user in User.objects.all():
@@ -27,7 +27,7 @@ class Command(BaseCommand):
             self.stdout.write(f"  Password set: {bool(user.password)}")
             self.stdout.write(f"  Company: {user.company}")
             self.stdout.write("  ---")
-        
+
         # Test specific email lookup
         test_emails = input("\nEnter email to test (or press Enter to skip): ").strip()
         if test_emails:
