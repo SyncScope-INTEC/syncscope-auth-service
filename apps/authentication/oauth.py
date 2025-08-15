@@ -160,11 +160,11 @@ def github_oauth_url(request):
     if not settings.GITHUB_CLIENT_ID:
         return Response({"error": "GitHub OAuth not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Use HTTPS for production Railway deployment
+    # Build redirect URI with proper HTTPS handling
     redirect_uri = request.build_absolute_uri("/auth/github/callback/")
-
-    # Force HTTPS for Railway deployments
-    if "railway.app" in redirect_uri:
+    
+    # Ensure HTTPS for production deployments
+    if request.META.get('HTTP_X_FORWARDED_PROTO') == 'https' or 'railway.app' in redirect_uri:
         redirect_uri = redirect_uri.replace("http://", "https://")
 
     oauth_url = (
