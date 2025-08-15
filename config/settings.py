@@ -118,8 +118,7 @@ db_options = {
 # This auth service should always use the auth schema
 # Django admin needs access to both schemas
 use_auth_schema = (
-    "test" not in config("DB_NAME", default="").lower()
-    and "test" not in os.environ.get("DATABASE_URL", "").lower()
+    "test" not in config("DB_NAME", default="").lower() and "test" not in os.environ.get("DATABASE_URL", "").lower()
 )
 
 if use_auth_schema:
