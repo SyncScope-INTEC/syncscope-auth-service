@@ -56,6 +56,9 @@ class User(RetryableModelMixin, AbstractUser):
     is_superuser = models.BooleanField(default=False)
     last_login = models.DateTimeField(null=True, blank=True)
     timezone = models.CharField(max_length=50, default="UTC")
+    is_verified = models.BooleanField(default=False)
+    github_id = models.CharField(max_length=50, null=True, blank=True, unique=True)
+    avatar_url = models.URLField(max_length=500, null=True, blank=True)
 
     username = None
     USERNAME_FIELD = "email"
