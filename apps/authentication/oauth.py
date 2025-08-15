@@ -162,9 +162,9 @@ def github_oauth_url(request):
 
     # Build redirect URI with proper HTTPS handling
     redirect_uri = request.build_absolute_uri("/auth/github/callback/")
-    
+
     # Ensure HTTPS for production deployments
-    if request.META.get('HTTP_X_FORWARDED_PROTO') == 'https' or 'railway.app' in redirect_uri:
+    if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
         redirect_uri = redirect_uri.replace("http://", "https://")
 
     oauth_url = (

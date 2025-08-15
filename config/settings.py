@@ -228,7 +228,7 @@ if "RAILWAY_ENVIRONMENT" in os.environ:
     USE_TZ = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = False  # Railway handles this
-    
+
 # Session security
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
