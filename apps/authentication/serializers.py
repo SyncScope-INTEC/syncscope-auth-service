@@ -53,13 +53,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(required=False)
+    password = serializers.CharField(write_only=True, required=False)
 
     def validate(self, attrs):
-        email = attrs.get("email", "").lower()
+        email = attrs.get("email", "")
         password = attrs.get("password")
 
+        if not email or not password:
+            raise serializers.ValidationError("Must include email and password")
+        
+        email = email.lower()
+        
         if email and password:
             try:
                 user = User.objects.get(email=email)
@@ -81,7 +86,7 @@ class UserLoginSerializer(serializers.Serializer):
         attrs["user"] = user
         return attrs
 
-    
+
 class UserProfileSerializer(serializers.ModelSerializer):
     company = CompanySerializer(read_only=True)
     full_name = serializers.CharField(read_only=True)
