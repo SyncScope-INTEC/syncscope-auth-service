@@ -71,6 +71,7 @@ def create_or_update_user_from_github(github_data):
         raise ValueError("GitHub account must have a public email")
 
     email = email.lower()
+    domain = extract_domain_from_email(email)
     name = github_data.get("name", "") or ""
     if name:
         name_parts = name.split(" ", 1)
@@ -107,7 +108,6 @@ def create_or_update_user_from_github(github_data):
     except User.DoesNotExist:
         pass
 
-    domain = extract_domain_from_email(email)
     company = None
 
     if github_data.get("company"):

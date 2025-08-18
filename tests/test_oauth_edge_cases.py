@@ -136,6 +136,7 @@ class TestGitHubOAuthEdgeCases:
         with (
             patch("django.conf.settings.GITHUB_CLIENT_ID", "test_client_id"),
             patch("django.conf.settings.GITHUB_CLIENT_SECRET", "test_client_secret"),
+            patch("django.conf.settings.RATELIMIT_ENABLE", False),
         ):
 
             response = api_client.post(url, data)
