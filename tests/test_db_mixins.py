@@ -51,9 +51,9 @@ class TestRetryableModelMixin:
         """Test that database_retry decorator is applied to methods."""
         # Check that the methods have been wrapped with the decorator
         # by looking for the wrapper function attributes
-        assert hasattr(company.save, '__wrapped__') or hasattr(company.save, '__name__')
-        assert hasattr(company.refresh_from_db, '__wrapped__') or hasattr(company.refresh_from_db, '__name__')
-        
+        assert hasattr(company.save, "__wrapped__") or hasattr(company.save, "__name__")
+        assert hasattr(company.refresh_from_db, "__wrapped__") or hasattr(company.refresh_from_db, "__name__")
+
         # Or test the actual functionality works (which it should if other tests pass)
         company.save()
         company.refresh_from_db()
@@ -153,6 +153,7 @@ class TestServerlessViewMixin:
 
         class TestView(ServerlessViewMixin, APIView):
             permission_classes = []
+
             def get(self, request):
                 return Response({"status": "ok"})
 
@@ -170,6 +171,7 @@ class TestServerlessViewMixin:
 
         class TestView(ServerlessViewMixin, APIView):
             permission_classes = []
+
             def get(self, request):
                 return Response({"status": "ok"})
 
@@ -195,6 +197,7 @@ class TestServerlessViewMixin:
 
         class TestView(ServerlessViewMixin, APIView):
             permission_classes = []
+
             def get(self, request):
                 return Response({"status": "ok"})
 

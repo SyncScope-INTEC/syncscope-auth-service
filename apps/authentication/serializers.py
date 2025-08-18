@@ -62,9 +62,9 @@ class UserLoginSerializer(serializers.Serializer):
 
         if not email or not password:
             raise serializers.ValidationError("Must include email and password")
-        
+
         email = email.lower()
-        
+
         if email and password:
             try:
                 user = User.objects.get(email=email)
@@ -75,7 +75,7 @@ class UserLoginSerializer(serializers.Serializer):
                 authenticated_user = authenticate(request=self.context.get("request"), email=email, password=password)
 
                 if not authenticated_user:
-                        raise serializers.ValidationError("Invalid credentials")
+                    raise serializers.ValidationError("Invalid credentials")
 
             except User.DoesNotExist:
                 raise serializers.ValidationError("Invalid credentials")
