@@ -205,7 +205,7 @@ def verify_token(request):
         except User.DoesNotExist:
             return Response({"valid": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    except InvalidToken:
+    except (InvalidToken, TokenError):
         return Response({"valid": False, "error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
