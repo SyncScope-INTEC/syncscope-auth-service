@@ -47,7 +47,7 @@ class TestRequestLoggingMiddleware:
 
         # Check that logger was called (should be called twice - request and response)
         assert mock_logger.info.call_count == 2
-        
+
         # Check first call (request log)
         first_call_args = mock_logger.info.call_args_list[0][0][0]
         assert "GET" in first_call_args
