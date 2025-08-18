@@ -1,4 +1,14 @@
+import os
+
+import django
 import pytest
+from django.conf import settings
+
+# Configure Django settings before importing anything else
+if not settings.configured:
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    django.setup()
+
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
