@@ -73,8 +73,25 @@ class RateLimitMiddleware(MiddlewareMixin):
 
         # Increment counter
         cache.set(cache_key, current_count + 1, window)
+        
+        # Store rate limit info for response headers
+        request._rate_limit_info = {
+            'limit': limit,
+            'remaining': max(0, limit - current_count - 1),
+            'reset': window
+        }
 
         return None
+
+    def process_response(self, request, response):
+        # Add rate limit headers if info is available
+        if hasattr(request, '_rate_limit_info'):
+            info = request._rate_limit_info
+            response['X-RateLimit-Limit'] = str(info['limit'])
+            response['X-RateLimit-Remaining'] = str(info['remaining'])
+            response['X-RateLimit-Reset'] = str(info['reset'])
+        
+        return response
 
     def get_client_ip(self, request):
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")

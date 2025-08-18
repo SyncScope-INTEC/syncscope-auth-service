@@ -80,7 +80,7 @@ class TestGitHubOAuthEdgeCases:
         # Check user was created with partial name
         user = User.objects.get(email="test@example.com")
         assert user.first_name == "TestUser"
-        assert user.last_name == ""
+        assert user.last_name == "."
 
     @patch("apps.authentication.oauth.exchange_code_for_token")
     @patch("apps.authentication.oauth.get_github_user_data")
@@ -111,7 +111,7 @@ class TestGitHubOAuthEdgeCases:
         # Check user was created with username as fallback
         user = User.objects.get(email="test@example.com")
         assert user.first_name == "testuser"
-        assert user.last_name == ""
+        assert user.last_name == "."
 
     @patch("apps.authentication.oauth.exchange_code_for_token")
     @patch("apps.authentication.oauth.get_github_user_data")

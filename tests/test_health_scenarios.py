@@ -122,11 +122,11 @@ class TestHealthCheckErrorScenarios:
 @pytest.mark.django_db
 class TestHealthCheckSettings:
 
-    @patch("django.conf.settings.VERSION", "2.0.0")
     def test_health_check_custom_version(self, api_client):
         """Test health check with custom version setting."""
         url = reverse("root_health_check")
-        response = api_client.get(url)
+        with patch("django.conf.settings.VERSION", "2.0.0", create=True):
+            response = api_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["version"] == "2.0.0"

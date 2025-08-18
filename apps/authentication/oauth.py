@@ -41,11 +41,16 @@ def get_github_user_data(access_token):
     user_response.raise_for_status()
     user_data = user_response.json()
 
-    emails_response = requests.get(emails_url, headers=headers)
-    emails_response.raise_for_status()
-    emails_data = emails_response.json()
+    try:
+        emails_response = requests.get(emails_url, headers=headers)
+        emails_response.raise_for_status()
+        emails_data = emails_response.json()
 
-    primary_email = next((email["email"] for email in emails_data if email["primary"]), user_data.get("email"))
+        primary_email = next((email["email"] for email in emails_data if email["primary"]), None)
+        if not primary_email:
+            primary_email = user_data.get("email") or (emails_data[0]["email"] if emails_data else None)
+    except Exception:
+        primary_email = user_data.get("email")
 
     return {
         "id": user_data["id"],
@@ -66,9 +71,14 @@ def create_or_update_user_from_github(github_data):
         raise ValueError("GitHub account must have a public email")
 
     email = email.lower()
-    name_parts = github_data.get("name", "").split(" ", 1)
-    first_name = name_parts[0] if name_parts else github_data["login"]
-    last_name = name_parts[1] if len(name_parts) > 1 else ""
+    name = github_data.get("name", "") or ""
+    if name:
+        name_parts = name.split(" ", 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else "."
+    else:
+        first_name = github_data["login"]
+        last_name = "."
 
     try:
         user = User.objects.get(github_id=github_id)
@@ -85,8 +95,13 @@ def create_or_update_user_from_github(github_data):
     try:
         user = User.objects.get(email=email)
         user.github_id = github_id
+        user.first_name = first_name
+        user.last_name = last_name
         user.avatar_url = github_data.get("avatar_url")
         user.is_verified = True
+        if github_data.get("company"):
+            company, _ = Company.objects.get_or_create(name=github_data["company"], defaults={"domain": domain})
+            user.company = company
         user.save()
         return user
     except User.DoesNotExist:

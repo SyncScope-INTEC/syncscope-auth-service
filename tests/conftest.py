@@ -62,6 +62,7 @@ def github_user():
         is_active=True,
         is_staff=False,
         is_superuser=False,
+        github_id="123456",
     )
 
 

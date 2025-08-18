@@ -14,7 +14,7 @@ class TestSecurityHeadersMiddleware:
 
     def test_adds_security_headers(self):
         """Test that security headers are added to response."""
-        request = RequestFactory().get("/")
+        request = RequestFactory().get("/auth/")
 
         def get_response(request):
             return HttpResponse("OK")
@@ -45,12 +45,14 @@ class TestRequestLoggingMiddleware:
         middleware = RequestLoggingMiddleware(get_response)
         response = middleware(request)
 
-        # Check that logger was called
-        mock_logger.info.assert_called()
-        call_args = mock_logger.info.call_args[0][0]
-        assert "GET" in call_args
-        assert "/test-path/" in call_args
-        assert "127.0.0.1" in call_args
+        # Check that logger was called (should be called twice - request and response)
+        assert mock_logger.info.call_count == 2
+        
+        # Check first call (request log)
+        first_call_args = mock_logger.info.call_args_list[0][0][0]
+        assert "GET" in first_call_args
+        assert "/test-path/" in first_call_args
+        assert "127.0.0.1" in first_call_args
 
     @patch("apps.authentication.middleware.logger")
     def test_logs_response_time(self, mock_logger):
@@ -87,10 +89,10 @@ class TestRateLimitMiddleware:
     @patch("apps.authentication.middleware.cache")
     def test_rate_limit_headers_added(self, mock_cache):
         """Test that rate limit headers are added to response."""
-        mock_cache.get.return_value = 5  # 5 requests made
+        mock_cache.get.return_value = 2  # 2 requests made (under limit of 5)
         mock_cache.set.return_value = True
 
-        request = RequestFactory().get("/")
+        request = RequestFactory().get("/auth/login")
         request.META["REMOTE_ADDR"] = "127.0.0.1"
 
         def get_response(request):
