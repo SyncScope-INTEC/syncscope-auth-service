@@ -1,5 +1,7 @@
 from django.contrib.auth import authenticate
 from django.db import transaction
+from django.http import HttpResponse
+from django.template import loader
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
@@ -232,3 +234,74 @@ class UserSessionsView(ServerlessViewMixin, APIView):
         else:
             invalidate_user_sessions(request.user)
             return Response({"message": "All sessions terminated"}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def api_home(request):
+    """
+    API Home page showing main navigation routes and service links.
+    """
+    # Define the main navigation routes
+    main_routes = [
+        {
+            "title": "API Documentation",
+            "description": "Interactive API documentation with live testing",
+            "url": request.build_absolute_uri("/api/docs/"),
+            "icon": "📖",
+            "category": "documentation",
+        },
+        {
+            "title": "ReDoc Documentation",
+            "description": "Clean, three-panel OpenAPI documentation",
+            "url": request.build_absolute_uri("/api/redoc/"),
+            "icon": "📚",
+            "category": "documentation",
+        },
+        {
+            "title": "OpenAPI Schema",
+            "description": "Raw OpenAPI specification in JSON format",
+            "url": request.build_absolute_uri("/api/schema/"),
+            "icon": "⚙️",
+            "category": "documentation",
+        },
+        {
+            "title": "Admin Interface",
+            "description": "Django admin panel for user and system management",
+            "url": request.build_absolute_uri("/admin/"),
+            "icon": "🔧",
+            "category": "admin",
+        },
+        {
+            "title": "Health Check",
+            "description": "Service health status and monitoring",
+            "url": request.build_absolute_uri("/health/"),
+            "icon": "❤️",
+            "category": "monitoring",
+        },
+    ]
+
+    # Quick stats about the service
+    service_info = {
+        "endpoints": 15,
+        "auth_methods": ["JWT", "GitHub OAuth"],
+        "features": ["User Management", "Session Tracking", "Health Monitoring"],
+        "status": "Operational",
+    }
+
+    context = {
+        "main_routes": main_routes,
+        "service_info": service_info,
+        "api_title": "SyncScope Auth Service",
+        "api_version": "1.0.0",
+        "api_description": "Authentication and user management service for SyncScope platform",
+        "base_url": request.build_absolute_uri("/"),
+    }
+
+    # Try to render HTML template first, fallback to JSON
+    try:
+        template = loader.get_template("authentication/api_home.html")
+        return HttpResponse(template.render(context, request))
+    except:
+        # Fallback to JSON response if template doesn't exist
+        return Response(context, status=status.HTTP_200_OK)

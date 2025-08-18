@@ -9,8 +9,11 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from apps.authentication.health import health_check
+from apps.authentication.views import api_home
 
 urlpatterns = [
+    # Home page
+    path("", api_home, name="api_home"),
     path("admin/", admin.site.urls),
     path("auth/", include("apps.authentication.urls")),
     # Root health check

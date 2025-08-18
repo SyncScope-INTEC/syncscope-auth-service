@@ -10,6 +10,7 @@ from .views import (
     ProfileView,
     RegisterView,
     UserSessionsView,
+    api_home,
     verify_token,
 )
 
