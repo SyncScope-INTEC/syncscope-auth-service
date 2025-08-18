@@ -6,6 +6,7 @@ from django.urls import reverse
 from rest_framework import status
 
 
+@patch("django_ratelimit.decorators.ratelimit", lambda *args, **kwargs: lambda x: x)
 @pytest.mark.django_db
 class TestHealthCheckErrorScenarios:
 
