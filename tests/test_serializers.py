@@ -160,6 +160,36 @@ class TestUserLoginSerializer:
         assert not serializer.is_valid()
         assert "Account is disabled" in str(serializer.errors)
 
+    def test_login_wrong_password_for_existing_user(self, user):
+        """Test login with wrong password for existing user."""
+        data = {"email": user.email, "password": "wrongpassword"}
+        serializer = UserLoginSerializer(data=data)
+
+        assert not serializer.is_valid()
+        assert "Invalid credentials" in str(serializer.errors)
+
+    def test_login_successful_authentication(self, user):
+        """Test successful login authentication."""
+        data = {"email": user.email, "password": "testpassword123"}
+
+        from django.test import RequestFactory
+
+        request = RequestFactory().post("/")
+
+        serializer = UserLoginSerializer(data=data, context={"request": request})
+
+        assert serializer.is_valid()
+        assert serializer.validated_data["user"] == user
+
+    def test_login_edge_case_empty_string_values(self):
+        """Test login with empty string values to check field validation."""
+        # This test checks field-level validation before custom validation
+        data = {"email": "", "password": ""}
+        serializer = UserLoginSerializer(data=data)
+
+        assert not serializer.is_valid()
+        assert "This field may not be blank" in str(serializer.errors)
+
 
 @pytest.mark.django_db
 class TestPasswordChangeSerializer:
