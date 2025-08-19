@@ -99,111 +99,112 @@ class TestDatabaseConfig(TestCase):
         self.assertEqual(config["PORT"], 5432)
         self.assertEqual(config["OPTIONS"]["options"], "-c search_path=auth")
 
-    @patch("config.database.psycopg2.connect")
-    @patch("django.conf.settings")
-    def test_create_auth_schema_if_not_exists_success(self, mock_settings, mock_connect):
+    def test_create_auth_schema_if_not_exists_success(self):
         """Test successful auth schema creation"""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_connect.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
-
-        mock_settings.DATABASES = {
-            "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
-        }
-
         from config.database import create_auth_schema_if_not_exists
 
-        # Capture print output
-        with patch("builtins.print") as mock_print:
-            create_auth_schema_if_not_exists()
+        with patch("config.database.psycopg2") as mock_psycopg2:
+            with patch("django.conf.settings") as mock_settings:
+                with patch("builtins.print") as mock_print:
+                    mock_conn = MagicMock()
+                    mock_cursor = MagicMock()
+                    mock_psycopg2.connect.return_value = mock_conn
+                    mock_conn.cursor.return_value = mock_cursor
 
-        mock_connect.assert_called_once_with(host="localhost", port="5432", user="user", password="pass", database="testdb")
-        mock_cursor.execute.assert_called_once_with("CREATE SCHEMA IF NOT EXISTS auth;")
-        mock_print.assert_called_with("✓ Auth schema created or already exists")
+                    mock_settings.DATABASES = {
+                        "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
+                    }
 
-    @patch("config.database.psycopg2.connect")
-    @patch("django.conf.settings")
-    def test_create_auth_schema_if_not_exists_failure(self, mock_settings, mock_connect):
+                    create_auth_schema_if_not_exists()
+
+                    mock_psycopg2.connect.assert_called_once_with(
+                        host="localhost", port="5432", user="user", password="pass", database="testdb"
+                    )
+                    mock_cursor.execute.assert_called_once_with("CREATE SCHEMA IF NOT EXISTS auth;")
+                    mock_print.assert_called_with("✓ Auth schema created or already exists")
+
+    def test_create_auth_schema_if_not_exists_failure(self):
         """Test auth schema creation failure"""
-        mock_connect.side_effect = Exception("Connection failed")
-
-        mock_settings.DATABASES = {
-            "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
-        }
-
         from config.database import create_auth_schema_if_not_exists
 
-        # Capture print output
-        with patch("builtins.print") as mock_print:
-            create_auth_schema_if_not_exists()
+        with patch("config.database.psycopg2") as mock_psycopg2:
+            with patch("django.conf.settings") as mock_settings:
+                with patch("builtins.print") as mock_print:
+                    mock_psycopg2.connect.side_effect = Exception("Connection failed")
 
-        mock_print.assert_any_call("Warning: Could not create auth schema: Connection failed")
-        mock_print.assert_any_call("Make sure to create the 'auth' schema manually in your PostgreSQL database")
+                    mock_settings.DATABASES = {
+                        "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
+                    }
+
+                    create_auth_schema_if_not_exists()
+
+                    mock_print.assert_any_call("Warning: Could not create auth schema: Connection failed")
+                    mock_print.assert_any_call("Make sure to create the 'auth' schema manually in your PostgreSQL database")
 
 
 class TestServerlessConfig(TestCase):
     """Test cases for config/serverless.py"""
 
-    @patch("config.serverless.configure_connection_pool")
-    @patch("django.conf.settings")
-    def test_setup_serverless_environment(self, mock_settings, mock_configure_pool):
+    def test_setup_serverless_environment(self):
         """Test serverless environment setup"""
-        mock_settings.REST_FRAMEWORK = {}
-        mock_settings.SIMPLE_JWT = {}
-        mock_settings.INSTALLED_APPS = ["debug_toolbar", "other_app"]
-        mock_settings.DEBUG = False
-        mock_settings.LOGGING = {"handlers": {"console": {}}}
+        with patch("config.serverless.configure_connection_pool") as mock_configure_pool:
+            with patch("config.serverless.settings") as mock_settings:
+                with patch("config.serverless.logger") as mock_logger:
+                    # Set up mock settings attributes
+                    mock_settings.REST_FRAMEWORK = {}
+                    mock_settings.SIMPLE_JWT = {}
+                    mock_settings.INSTALLED_APPS = ["debug_toolbar", "other_app"]
+                    mock_settings.DEBUG = False
+                    mock_settings.LOGGING = {"handlers": {"console": {}}}
 
-        from config.serverless import setup_serverless_environment
+                    from config.serverless import setup_serverless_environment
 
-        with patch("config.serverless.logger") as mock_logger:
-            setup_serverless_environment()
+                    setup_serverless_environment()
 
-        # Verify configuration updates
-        self.assertEqual(mock_settings.REST_FRAMEWORK["DEFAULT_TIMEOUT"], 30)
-        self.assertEqual(mock_settings.INSTALLED_APPS, ["other_app"])
-        mock_configure_pool.assert_called_once()
-        mock_logger.info.assert_called_with("✓ Serverless environment configured")
+                    # Verify configuration updates
+                    self.assertEqual(mock_settings.REST_FRAMEWORK["DEFAULT_TIMEOUT"], 30)
+                    self.assertEqual(mock_settings.INSTALLED_APPS, ["other_app"])
+                    mock_configure_pool.assert_called_once()
+                    mock_logger.info.assert_called_with("✓ Serverless environment configured")
 
-    @patch("django.conf.settings")
-    def test_validate_serverless_config_valid(self, mock_settings):
+    def test_validate_serverless_config_valid(self):
         """Test serverless configuration validation - valid config"""
-        mock_settings.DATABASES = {"default": {"CONN_MAX_AGE": 0}}
-        mock_settings.CACHES = {"default": {"LOCATION": "redis://localhost:6379"}}
-        mock_settings.SECRET_KEY = "valid-secret-key"
-        mock_settings.DEBUG = False
-
-        from config.serverless import validate_serverless_config
-
-        with patch.dict(os.environ, {"RAILWAY_ENVIRONMENT": "development"}):
+        with patch("config.serverless.settings") as mock_settings:
             with patch("config.serverless.logger") as mock_logger:
-                is_valid, issues = validate_serverless_config()
+                mock_settings.DATABASES = {"default": {"CONN_MAX_AGE": 0}}
+                mock_settings.CACHES = {"default": {"LOCATION": "redis://localhost:6379"}}
+                mock_settings.SECRET_KEY = "valid-secret-key"
+                mock_settings.DEBUG = False
 
-        self.assertTrue(is_valid)
-        self.assertEqual(issues, [])
-        mock_logger.info.assert_called_with("✓ Serverless configuration validated")
+                from config.serverless import validate_serverless_config
 
-    @patch("django.conf.settings")
-    def test_validate_serverless_config_invalid(self, mock_settings):
+                with patch.dict(os.environ, {"RAILWAY_ENVIRONMENT": "development"}):
+                    is_valid, issues = validate_serverless_config()
+
+                self.assertTrue(is_valid)
+                self.assertEqual(issues, [])
+                mock_logger.info.assert_called_with("✓ Serverless configuration validated")
+
+    def test_validate_serverless_config_invalid(self):
         """Test serverless configuration validation - invalid config"""
-        mock_settings.DATABASES = {"default": {"CONN_MAX_AGE": 300}}
-        mock_settings.CACHES = {"default": {"LOCATION": "locmem://default"}}
-        mock_settings.SECRET_KEY = "django-insecure-change-me-in-production"
-        mock_settings.DEBUG = True
-
-        from config.serverless import validate_serverless_config
-
-        with patch.dict(os.environ, {"RAILWAY_ENVIRONMENT": "production"}):
+        with patch("config.serverless.settings") as mock_settings:
             with patch("config.serverless.logger") as mock_logger:
-                is_valid, issues = validate_serverless_config()
+                mock_settings.DATABASES = {"default": {"CONN_MAX_AGE": 300}}
+                mock_settings.CACHES = {"default": {"LOCATION": "locmem://default"}}
+                mock_settings.SECRET_KEY = "django-insecure-change-me-in-production"
+                mock_settings.DEBUG = True
 
-        self.assertFalse(is_valid)
-        self.assertEqual(len(issues), 4)
-        self.assertIn("CONN_MAX_AGE should be 0 for serverless", issues)
-        self.assertIn("Redis cache is recommended for serverless", issues)
-        self.assertIn("SECRET_KEY should be changed for production", issues)
-        self.assertIn("DEBUG should be False in production", issues)
+                from config.serverless import validate_serverless_config
+
+                with patch.dict(os.environ, {"RAILWAY_ENVIRONMENT": "production"}):
+                    is_valid, issues = validate_serverless_config()
+
+                self.assertFalse(is_valid)
+                self.assertEqual(len(issues), 4)
+                self.assertIn("CONN_MAX_AGE should be 0 for serverless", issues)
+                self.assertIn("Redis cache is recommended for serverless", issues)
+                self.assertIn("SECRET_KEY should be changed for production", issues)
+                self.assertIn("DEBUG should be False in production", issues)
 
     @patch("django.core.cache.cache")
     @patch("django.db.connection")
@@ -239,18 +240,20 @@ class TestServerlessConfig(TestCase):
         self.assertEqual(metrics["database_vendor"], "postgresql")
         self.assertIsNone(metrics["cache_latency_ms"])
 
-    @patch.dict(os.environ, {"SERVERLESS_ENV": "true"})
-    @patch("config.serverless.setup_serverless_environment")
-    def test_auto_configure_on_import(self, mock_setup):
+    def test_auto_configure_on_import(self):
         """Test that serverless environment is auto-configured on import"""
-        # Re-import the module to trigger auto-configuration
-        import importlib
+        # Remove the module if it's already imported
+        import sys
 
-        import config.serverless
+        if "config.serverless" in sys.modules:
+            del sys.modules["config.serverless"]
 
-        importlib.reload(config.serverless)
+        with patch.dict(os.environ, {"SERVERLESS_ENV": "true"}):
+            with patch("config.serverless.setup_serverless_environment") as mock_setup:
+                # Import the module which should trigger auto-configuration
+                import config.serverless
 
-        mock_setup.assert_called_once()
+                mock_setup.assert_called_once()
 
     @patch.dict(os.environ, {"SERVERLESS_ENV": "false"})
     @patch("config.serverless.setup_serverless_environment")

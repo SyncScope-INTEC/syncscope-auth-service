@@ -22,20 +22,27 @@ class TestCheckDbHealthCommand(TestCase):
         self.out = StringIO()
         self.err = StringIO()
 
-    @patch("apps.authentication.management.commands.check_db_health.DatabaseHealthCheck.is_healthy")
-    @patch("sys.exit")
-    def test_successful_health_check(self, mock_exit, mock_is_healthy):
+    def tearDown(self):
+        # Clean up any patches
+        pass
+
+    def test_successful_health_check(self):
         """Test successful database health check"""
-        mock_is_healthy.return_value = True
+        # Test the command behavior without sys.exit by catching the exception
+        with patch("config.database_retry.DatabaseHealthCheck.is_healthy", return_value=True):
+            try:
+                call_command("check_db_health", stdout=self.out, stderr=self.err)
+            except SystemExit as e:
+                # Verify it exits with code 0 (success)
+                self.assertEqual(e.code, 0)
 
-        call_command("check_db_health", stdout=self.out, stderr=self.err)
+                output = self.out.getvalue()
+                self.assertIn("Database is healthy", output)
+            else:
+                self.fail("Expected SystemExit to be raised")
 
-        output = self.out.getvalue()
-        self.assertIn("Database is healthy", output)
-        mock_exit.assert_called_once_with(0)
-
-    @patch("apps.authentication.management.commands.check_db_health.DatabaseHealthCheck.is_healthy")
-    @patch("sys.exit")
+    @patch("config.database_retry.DatabaseHealthCheck.is_healthy")
+    @patch("apps.authentication.management.commands.check_db_health.sys.exit")
     def test_failed_health_check_after_retries(self, mock_exit, mock_is_healthy):
         """Test failed database health check after all retries"""
         mock_is_healthy.return_value = False
@@ -46,8 +53,8 @@ class TestCheckDbHealthCommand(TestCase):
         self.assertIn("Database is unhealthy after 2 attempts", output)
         mock_exit.assert_called_once_with(1)
 
-    @patch("apps.authentication.management.commands.check_db_health.DatabaseHealthCheck.is_healthy")
-    @patch("sys.exit")
+    @patch("config.database_retry.DatabaseHealthCheck.is_healthy")
+    @patch("apps.authentication.management.commands.check_db_health.sys.exit")
     def test_health_check_with_exception(self, mock_exit, mock_is_healthy):
         """Test health check with exception"""
         mock_is_healthy.side_effect = Exception("Database connection error")
@@ -59,16 +66,17 @@ class TestCheckDbHealthCommand(TestCase):
         self.assertIn("Database connection error", output)
         mock_exit.assert_called_once_with(1)
 
-    @patch("apps.authentication.management.commands.check_db_health.DatabaseHealthCheck.is_healthy")
-    @patch("sys.exit")
-    def test_no_cache_option(self, mock_exit, mock_is_healthy):
+    def test_no_cache_option(self):
         """Test --no-cache option"""
-        mock_is_healthy.return_value = True
-
-        call_command("check_db_health", "--no-cache", stdout=self.out, stderr=self.err)
-
-        mock_is_healthy.assert_called_with(use_cache=False)
-        mock_exit.assert_called_once_with(0)
+        with patch("config.database_retry.DatabaseHealthCheck.is_healthy", return_value=True) as mock_is_healthy:
+            try:
+                call_command("check_db_health", "--no-cache", stdout=self.out, stderr=self.err)
+            except SystemExit as e:
+                # Verify it exits with code 0 (success)
+                self.assertEqual(e.code, 0)
+                mock_is_healthy.assert_called_with(use_cache=False)
+            else:
+                self.fail("Expected SystemExit to be raised")
 
 
 class TestCleanupSessionsCommand(TestCase):
@@ -87,9 +95,16 @@ class TestCleanupSessionsCommand(TestCase):
 
     def test_cleanup_with_expired_sessions_dry_run(self):
         """Test dry run mode with expired sessions"""
-        # Create an expired session
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        # Create a user first
+        user = User.objects.create_user(email="test@example.com", password="testpass", first_name="Test", last_name="User")
+
+        # Create an expired session with correct field names
         past_time = timezone.now() - timezone.timedelta(hours=1)
-        UserSession.objects.create(user_id=1, session_key="test_session", expires_at=past_time)
+        UserSession.objects.create(user=user, token_hash="test_token_hash", expires_at=past_time)
 
         call_command("cleanup_sessions", "--dry-run", stdout=self.out, stderr=self.err)
 
@@ -101,9 +116,16 @@ class TestCleanupSessionsCommand(TestCase):
     @patch("apps.authentication.models.UserSession.cleanup_expired_sessions")
     def test_cleanup_with_expired_sessions_actual(self, mock_cleanup):
         """Test actual cleanup of expired sessions"""
-        # Create an expired session
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        # Create a user first
+        user = User.objects.create_user(email="test2@example.com", password="testpass", first_name="Test2", last_name="User2")
+
+        # Create an expired session with correct field names
         past_time = timezone.now() - timezone.timedelta(hours=1)
-        UserSession.objects.create(user_id=1, session_key="test_session", expires_at=past_time)
+        UserSession.objects.create(user=user, token_hash="test_token_hash_2", expires_at=past_time)
 
         call_command("cleanup_sessions", stdout=self.out, stderr=self.err)
 
@@ -114,11 +136,18 @@ class TestCleanupSessionsCommand(TestCase):
     @patch("apps.authentication.models.UserSession.cleanup_expired_sessions")
     def test_cleanup_with_exception(self, mock_cleanup):
         """Test cleanup with exception"""
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        # Create a user first
+        user = User.objects.create_user(email="test3@example.com", password="testpass", first_name="Test3", last_name="User3")
+
         mock_cleanup.side_effect = Exception("Cleanup failed")
 
-        # Create an expired session
+        # Create an expired session with correct field names
         past_time = timezone.now() - timezone.timedelta(hours=1)
-        UserSession.objects.create(user_id=1, session_key="test_session", expires_at=past_time)
+        UserSession.objects.create(user=user, token_hash="test_token_hash_3", expires_at=past_time)
 
         with self.assertRaises(Exception):
             call_command("cleanup_sessions", stdout=self.out, stderr=self.err)
@@ -208,10 +237,12 @@ class TestMigrateToAuthSchemaCommand(TestCase):
         mock_cursor_obj = MagicMock()
         mock_cursor.return_value.__enter__.return_value = mock_cursor_obj
 
-        # Mock different return values for different queries
+        # Mock different return values for different queries - need more side_effect values
         mock_cursor_obj.fetchall.side_effect = [
             [("authentication_user",), ("companies",)],  # public tables
             [("users",), ("companies",)],  # auth tables
+            [],  # constraints query for authentication_user
+            [],  # constraints query for companies
         ]
 
         call_command("migrate_to_auth_schema", stdout=self.out, stderr=self.err)
