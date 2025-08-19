@@ -103,18 +103,65 @@ jobs:
           coverage xml
 
       - name: Check coverage threshold
+        id: coverage_check
         run: |
           # Extract coverage percentage and fail if below 80%
           COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
           echo "Current coverage: ${COVERAGE}%"
+          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
           
           if (( $(echo "$COVERAGE < 80" | bc -l) )); then
             echo "❌ Coverage is ${COVERAGE}%, which is below the required 80% threshold"
             echo "Please add more tests to improve coverage"
+            echo "status=failed" >> $GITHUB_OUTPUT
             exit 1
           else
             echo "✅ Coverage is ${COVERAGE}%, which meets the 80% threshold"
+            echo "status=passed" >> $GITHUB_OUTPUT
           fi
+
+      - name: Comment coverage report on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const coverage = '${{ steps.coverage_check.outputs.coverage }}';
+            const status = '${{ steps.coverage_check.outputs.status }}';
+            const emoji = status === 'passed' ? '✅' : '❌';
+            const statusText = status === 'passed' ? 'PASSED' : 'FAILED';
+            
+            // Get the coverage report
+            const { execSync } = require('child_process');
+            let coverageReport;
+            try {
+              coverageReport = execSync('coverage report', { encoding: 'utf8' });
+            } catch (error) {
+              coverageReport = 'Unable to generate coverage report';
+            }
+            
+            const comment = `## ${emoji} Coverage Report - ${statusText}
+            
+            **Current Coverage: ${coverage}%**
+            ${status === 'passed' ? '✅ Meets the 80% threshold requirement' : '❌ Below the 80% threshold requirement'}
+            
+            <details>
+            <summary>📊 Detailed Coverage Report</summary>
+            
+            \`\`\`
+            ${coverageReport}
+            \`\`\`
+            
+            </details>
+            
+            ${status === 'failed' ? '⚠️ **Action Required:** Please add more tests to improve coverage above 80%' : '🎉 Great job maintaining good test coverage!'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
 
       - name: Security check
         continue-on-error: true
