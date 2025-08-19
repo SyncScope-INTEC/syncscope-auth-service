@@ -99,47 +99,45 @@ class TestDatabaseConfig(TestCase):
         self.assertEqual(config["PORT"], 5432)
         self.assertEqual(config["OPTIONS"]["options"], "-c search_path=auth")
 
-    def test_create_auth_schema_if_not_exists_success(self):
+    @patch("builtins.print")
+    @patch("django.conf.settings")
+    @patch("psycopg2.connect")
+    def test_create_auth_schema_if_not_exists_success(self, mock_connect, mock_settings, mock_print):
         """Test successful auth schema creation"""
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+
+        mock_settings.DATABASES = {
+            "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
+        }
+
         from config.database import create_auth_schema_if_not_exists
 
-        with patch("config.database.psycopg2") as mock_psycopg2:
-            with patch("django.conf.settings") as mock_settings:
-                with patch("builtins.print") as mock_print:
-                    mock_conn = MagicMock()
-                    mock_cursor = MagicMock()
-                    mock_psycopg2.connect.return_value = mock_conn
-                    mock_conn.cursor.return_value = mock_cursor
+        create_auth_schema_if_not_exists()
 
-                    mock_settings.DATABASES = {
-                        "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
-                    }
+        mock_connect.assert_called_once_with(host="localhost", port="5432", user="user", password="pass", database="testdb")
+        mock_cursor.execute.assert_called_once_with("CREATE SCHEMA IF NOT EXISTS auth;")
+        mock_print.assert_called_with("✓ Auth schema created or already exists")
 
-                    create_auth_schema_if_not_exists()
-
-                    mock_psycopg2.connect.assert_called_once_with(
-                        host="localhost", port="5432", user="user", password="pass", database="testdb"
-                    )
-                    mock_cursor.execute.assert_called_once_with("CREATE SCHEMA IF NOT EXISTS auth;")
-                    mock_print.assert_called_with("✓ Auth schema created or already exists")
-
-    def test_create_auth_schema_if_not_exists_failure(self):
+    @patch("builtins.print")
+    @patch("django.conf.settings")
+    @patch("psycopg2.connect")
+    def test_create_auth_schema_if_not_exists_failure(self, mock_connect, mock_settings, mock_print):
         """Test auth schema creation failure"""
+        mock_connect.side_effect = Exception("Connection failed")
+
+        mock_settings.DATABASES = {
+            "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
+        }
+
         from config.database import create_auth_schema_if_not_exists
 
-        with patch("config.database.psycopg2") as mock_psycopg2:
-            with patch("django.conf.settings") as mock_settings:
-                with patch("builtins.print") as mock_print:
-                    mock_psycopg2.connect.side_effect = Exception("Connection failed")
+        create_auth_schema_if_not_exists()
 
-                    mock_settings.DATABASES = {
-                        "default": {"HOST": "localhost", "PORT": "5432", "USER": "user", "PASSWORD": "pass", "NAME": "testdb"}
-                    }
-
-                    create_auth_schema_if_not_exists()
-
-                    mock_print.assert_any_call("Warning: Could not create auth schema: Connection failed")
-                    mock_print.assert_any_call("Make sure to create the 'auth' schema manually in your PostgreSQL database")
+        mock_print.assert_any_call("Warning: Could not create auth schema: Connection failed")
+        mock_print.assert_any_call("Make sure to create the 'auth' schema manually in your PostgreSQL database")
 
 
 class TestServerlessConfig(TestCase):

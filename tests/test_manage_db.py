@@ -32,7 +32,7 @@ class TestManageDb(TestCase):
         mock_setup.assert_called_once()
 
     @patch("manage_db.setup_django")
-    @patch("manage_db.create_auth_schema_if_not_exists")
+    @patch("config.database.create_auth_schema_if_not_exists")
     @patch("builtins.print")
     def test_create_auth_schema_success(self, mock_print, mock_create_schema, mock_setup_django):
         """Test successful auth schema creation"""
@@ -48,7 +48,7 @@ class TestManageDb(TestCase):
         mock_print.assert_called_with("✓ Successfully created auth schema")
 
     @patch("manage_db.setup_django")
-    @patch("manage_db.create_auth_schema_if_not_exists")
+    @patch("config.database.create_auth_schema_if_not_exists")
     @patch("builtins.print")
     def test_create_auth_schema_failure(self, mock_print, mock_create_schema, mock_setup_django):
         """Test auth schema creation failure"""
