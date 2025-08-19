@@ -13,52 +13,55 @@ class TestSettingsConfiguration:
         """Test default ALLOWED_HOSTS configuration."""
         # Test the current ALLOWED_HOSTS without environment variables
         from config import settings as settings_module
-        
+
         # Test that ALLOWED_HOSTS contains the default values
         # Since Railway environment variables shouldn't be set in CI by default,
         # we can test the current configuration
-        assert hasattr(settings_module, 'ALLOWED_HOSTS')
+        assert hasattr(settings_module, "ALLOWED_HOSTS")
         assert isinstance(settings_module.ALLOWED_HOSTS, list)
-        
+
         # Should contain some basic hosts (localhost, 127.0.0.1)
         # Note: In CI, the exact hosts may vary, so we just ensure it's configured
         assert len(settings_module.ALLOWED_HOSTS) > 0
 
     def test_railway_environment_configuration_logic(self):
         """Test Railway environment configuration logic exists."""
-        from config import settings as settings_module
         import inspect
-        
+
+        from config import settings as settings_module
+
         # Get the source code of the settings module
         source = inspect.getsource(settings_module)
-        
+
         # Check that Railway environment logic exists
-        assert 'RAILWAY_ENVIRONMENT' in source
-        assert 'healthcheck.railway.app' in source or 'railway.app' in source
+        assert "RAILWAY_ENVIRONMENT" in source
+        assert "healthcheck.railway.app" in source or "railway.app" in source
 
     def test_railway_public_domain_configuration_logic(self):
         """Test that RAILWAY_PUBLIC_DOMAIN configuration logic exists."""
-        from config import settings as settings_module
         import inspect
-        
+
+        from config import settings as settings_module
+
         # Get the source code of the settings module
         source = inspect.getsource(settings_module)
-        
+
         # Check that Railway public domain logic exists
-        assert 'RAILWAY_PUBLIC_DOMAIN' in source
-        assert 'railway_public_domain' in source
+        assert "RAILWAY_PUBLIC_DOMAIN" in source
+        assert "railway_public_domain" in source
 
     def test_database_url_configuration_logic(self):
         """Test database URL configuration logic exists."""
-        from config import settings as settings_module
         import inspect
-        
+
+        from config import settings as settings_module
+
         # Get the source code of the settings module
         source = inspect.getsource(settings_module)
-        
+
         # Check that DATABASE_URL logic exists
-        assert 'DATABASE_URL' in source
-        assert 'dj_database_url' in source or 'parse' in source
+        assert "DATABASE_URL" in source
+        assert "dj_database_url" in source or "parse" in source
 
     def test_database_options_configuration(self):
         """Test database options configuration logic."""
@@ -75,24 +78,25 @@ class TestSettingsConfiguration:
 
     def test_railway_proxy_configuration_logic(self):
         """Test proxy configuration logic for Railway exists."""
-        from config import settings as settings_module
         import inspect
-        
+
+        from config import settings as settings_module
+
         # Get the source code of the settings module
         source = inspect.getsource(settings_module)
-        
+
         # Check that Railway proxy logic exists
-        assert 'RAILWAY_ENVIRONMENT' in source
-        assert 'SECURE_PROXY_SSL_HEADER' in source or 'HTTP_X_FORWARDED_PROTO' in source
+        assert "RAILWAY_ENVIRONMENT" in source
+        assert "SECURE_PROXY_SSL_HEADER" in source or "HTTP_X_FORWARDED_PROTO" in source
 
     def test_debug_mode_affects_security_settings(self):
         """Test that DEBUG mode affects security settings."""
         from config import settings as settings_module
-        
+
         # Test that security settings exist and are related to DEBUG mode
         assert hasattr(settings_module, "DEBUG")
         assert hasattr(settings_module, "SECURE_HSTS_PRELOAD")
-        
+
         # SECURE_HSTS_PRELOAD should be the opposite of DEBUG
         assert settings_module.SECURE_HSTS_PRELOAD == (not settings_module.DEBUG)
 
