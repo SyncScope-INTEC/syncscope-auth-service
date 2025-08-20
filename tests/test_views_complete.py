@@ -248,7 +248,7 @@ class TestChangePasswordView(APITestCase):
 
     def test_change_password_success(self):
         """Test successful password change"""
-        data = {"old_password": "oldpass123", "new_password": "newpass123"}
+        data = {"old_password": "oldpass123", "new_password": "newstrongpassword456"}
 
         response = self.client.post(self.url, data)
 
@@ -257,7 +257,7 @@ class TestChangePasswordView(APITestCase):
 
     def test_change_password_wrong_old_password(self):
         """Test password change with wrong old password"""
-        data = {"old_password": "wrongpass123", "new_password": "newpass123"}
+        data = {"old_password": "wrongpass123", "new_password": "newstrongpassword456"}
 
         response = self.client.post(self.url, data)
 
