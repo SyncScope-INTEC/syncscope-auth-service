@@ -176,7 +176,8 @@ class Command(BaseCommand):
         """Verify that required tables exist in the database"""
         self.stdout.write("🔍 Verifying required tables exist...")
 
-        required_tables = ["authentication_user", "authentication_usersession", "authentication_company"]
+        # These are the actual table names used by the models
+        required_tables = ["users", "user_sessions", "companies"]
 
         try:
             with connection.cursor() as cursor:
