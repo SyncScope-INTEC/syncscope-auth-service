@@ -313,7 +313,6 @@ def api_home(request):
         import sys
 
         is_testing = "pytest" in sys.modules or "test" in sys.argv
-
         template = loader.get_template("authentication/api_home.html")
         return HttpResponse(template.render(context, request))
     except:
