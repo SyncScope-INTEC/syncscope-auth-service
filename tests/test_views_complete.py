@@ -5,7 +5,7 @@ Comprehensive tests for views.py to improve coverage
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -15,6 +15,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from apps.authentication.models import Company, User, UserSession
 
 
+@override_settings(RATELIMIT_ENABLE=False)
 class TestRegisterView(APITestCase):
     """Test RegisterView"""
 
@@ -23,7 +24,7 @@ class TestRegisterView(APITestCase):
 
     def test_register_success(self):
         """Test successful user registration"""
-        data = {"email": "test@example.com", "password": "testpass123", "first_name": "Test", "last_name": "User"}
+        data = {"email": "test@example.com", "password": "testpass123", "password_confirm": "testpass123", "first_name": "Test", "last_name": "User"}
 
         response = self.client.post(self.url, data)
 
@@ -54,13 +55,14 @@ class TestRegisterView(APITestCase):
         """Test registration with duplicate email"""
         User.objects.create_user(email="test@example.com", password="testpass123", first_name="Existing", last_name="User")
 
-        data = {"email": "test@example.com", "password": "testpass123", "first_name": "Test", "last_name": "User"}
+        data = {"email": "test@example.com", "password": "testpass123", "password_confirm": "testpass123", "first_name": "Test", "last_name": "User"}
 
         response = self.client.post(self.url, data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+@override_settings(RATELIMIT_ENABLE=False)
 class TestLoginView(APITestCase):
     """Test LoginView"""
 
@@ -214,7 +216,8 @@ class TestProfileView(APITestCase):
 
     def test_update_profile_invalid_data(self):
         """Test profile update with invalid data"""
-        data = {"email": "invalid-email"}
+        # Use a field that will definitely fail validation
+        data = {"first_name": ""}  # Empty first name should fail
 
         response = self.client.put(self.url, data)
 
@@ -295,7 +298,7 @@ class TestVerifyTokenView(APITestCase):
         self.user = User.objects.create_user(
             email="test@example.com", password="testpass123", first_name="Test", last_name="User"
         )
-        self.company = Company.objects.create(name="Test Company")
+        self.company = Company.objects.create(name="Test Company", domain="@example.com")
         self.user.company = self.company
         self.user.save()
 
@@ -458,7 +461,7 @@ class TestApiHomeView(APITestCase):
 
     def test_api_home_json_response(self):
         """Test API home with JSON response"""
-        response = self.client.get(self.url)
+        response = self.client.get(self.url + "?format=json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("main_routes", response.data)
