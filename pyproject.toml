@@ -61,8 +61,7 @@ omit = [
     "*/virtualenv/*",
     "manage.py",
     "*/settings/*",
-    "*/tests/*",
-    "test_security.py"
+    "*/tests/*"
 ]
 
 [tool.coverage.report]
