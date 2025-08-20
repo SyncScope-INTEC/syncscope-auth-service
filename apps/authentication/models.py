@@ -79,10 +79,11 @@ class User(RetryableModelMixin, AbstractUser):
         if self.email:
             self.email = self.email.lower()
 
-        if self.company:
+        # Only validate domain if user has a company
+        if self.company and self.email:
             email_domain = f"@{self.email.split('@')[1]}"
             if self.company.domain != email_domain:
-                raise ValidationError(f"Email domain must match company domain: {self.company.domain}")
+                raise ValidationError({"__all__": [f"Email domain must match company domain: {self.company.domain}"]})
 
     @atomic_with_retry()
     def save(self, *args, **kwargs):

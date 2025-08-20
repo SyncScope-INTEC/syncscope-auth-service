@@ -119,6 +119,16 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = ["first_name", "last_name", "avatar_url", "timezone"]
 
+    def validate_first_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("First name cannot be empty")
+        return value
+
+    def validate_last_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Last name cannot be empty")
+        return value
+
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -129,7 +139,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 class PasswordChangeSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True, validators=[validate_password])
-    new_password_confirm = serializers.CharField(write_only=True)
+    new_password_confirm = serializers.CharField(write_only=True, required=False)
 
     def validate_old_password(self, value):
         user = self.context["request"].user
@@ -138,8 +148,11 @@ class PasswordChangeSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        if attrs["new_password"] != attrs["new_password_confirm"]:
-            raise serializers.ValidationError("New passwords don't match")
+        # Only validate password confirmation if it's provided
+        new_password_confirm = attrs.get("new_password_confirm")
+        if new_password_confirm is not None:
+            if attrs["new_password"] != new_password_confirm:
+                raise serializers.ValidationError("New passwords don't match")
         return attrs
 
     def save(self):
