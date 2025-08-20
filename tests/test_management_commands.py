@@ -88,91 +88,63 @@ class TestCleanupSessionsCommand(TestCase):
 
     def test_cleanup_with_no_expired_sessions(self):
         """Test cleanup when no expired sessions exist"""
-        try:
+        # Mock the cleanup method to avoid database dependency
+        with patch("apps.authentication.models.UserSession.objects.filter") as mock_filter:
+            mock_queryset = MagicMock()
+            mock_queryset.count.return_value = 0
+            mock_filter.return_value = mock_queryset
+
             call_command("cleanup_sessions", stdout=self.out, stderr=self.err)
             output = self.out.getvalue()
             self.assertIn("No expired sessions found", output)
-        except Exception as e:
-            # Skip if database tables don't exist (CI environment issue)
-            if "does not exist" in str(e):
-                self.skipTest(f"Database table missing: {e}")
-            raise
 
     def test_cleanup_with_expired_sessions_dry_run(self):
         """Test dry run mode with expired sessions"""
-        try:
-            from django.contrib.auth import get_user_model
-
-            User = get_user_model()
-
-            # Create a user first
-            user = User.objects.create_user(email="test@example.com", password="testpass", first_name="Test", last_name="User")
-
-            # Create an expired session with correct field names
-            past_time = timezone.now() - timezone.timedelta(hours=1)
-            UserSession.objects.create(user=user, token_hash="test_token_hash", expires_at=past_time)
+        # Mock the cleanup query to simulate expired sessions
+        with patch("apps.authentication.models.UserSession.objects.filter") as mock_filter:
+            mock_queryset = MagicMock()
+            mock_queryset.count.return_value = 1
+            mock_filter.return_value = mock_queryset
 
             call_command("cleanup_sessions", "--dry-run", stdout=self.out, stderr=self.err)
 
             output = self.out.getvalue()
             self.assertIn("DRY RUN: Would delete 1 expired sessions", output)
-            # Verify session wasn't actually deleted
-            self.assertEqual(UserSession.objects.count(), 1)
-        except Exception as e:
-            # Skip if database tables don't exist (CI environment issue)
-            if "does not exist" in str(e):
-                self.skipTest(f"Database table missing: {e}")
-            raise
+            # Verify delete was not called in dry run
+            mock_queryset.delete.assert_not_called()
 
-    @patch("apps.authentication.models.UserSession.cleanup_expired_sessions")
-    def test_cleanup_with_expired_sessions_actual(self, mock_cleanup):
+    def test_cleanup_with_expired_sessions_actual(self):
         """Test actual cleanup of expired sessions"""
-        try:
-            from django.contrib.auth import get_user_model
+        # Mock the cleanup to simulate successful deletion
+        with patch("apps.authentication.models.UserSession.objects.filter") as mock_filter:
+            with patch("apps.authentication.models.UserSession.cleanup_expired_sessions") as mock_cleanup:
+                mock_queryset = MagicMock()
+                mock_queryset.count.return_value = 1
+                mock_filter.return_value = mock_queryset
+                mock_cleanup.return_value = 1  # Return count of deleted sessions
 
-            User = get_user_model()
+                call_command("cleanup_sessions", stdout=self.out, stderr=self.err)
 
-            # Create a user first
-            user = User.objects.create_user(
-                email="test2@example.com", password="testpass", first_name="Test2", last_name="User2"
-            )
+                output = self.out.getvalue()
+                self.assertIn("Successfully cleaned up 1 expired sessions", output)
+                mock_cleanup.assert_called_once()
 
-            # Create an expired session with correct field names
-            past_time = timezone.now() - timezone.timedelta(hours=1)
-            UserSession.objects.create(user=user, token_hash="test_token_hash_2", expires_at=past_time)
+    def test_cleanup_with_exception(self):
+        """Test cleanup with exception"""
+        # Mock cleanup to raise an exception
+        with patch("apps.authentication.models.UserSession.objects.filter") as mock_filter:
+            mock_queryset = MagicMock()
+            mock_queryset.count.return_value = 1
+            mock_filter.return_value = mock_queryset
 
-            call_command("cleanup_sessions", stdout=self.out, stderr=self.err)
+            # Make the cleanup operation fail
+            mock_queryset.delete.side_effect = Exception("Cleanup failed")
+
+            with self.assertRaises(Exception):
+                call_command("cleanup_sessions", stdout=self.out, stderr=self.err)
 
             output = self.out.getvalue()
-            self.assertIn("Successfully cleaned up 1 expired sessions", output)
-            mock_cleanup.assert_called_once()
-        except Exception as e:
-            # Skip if database tables don't exist (CI environment issue)
-            if "does not exist" in str(e):
-                self.skipTest(f"Database table missing: {e}")
-            raise
-
-    @patch("apps.authentication.models.UserSession.cleanup_expired_sessions")
-    def test_cleanup_with_exception(self, mock_cleanup):
-        """Test cleanup with exception"""
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-
-        # Create a user first
-        user = User.objects.create_user(email="test3@example.com", password="testpass", first_name="Test3", last_name="User3")
-
-        mock_cleanup.side_effect = Exception("Cleanup failed")
-
-        # Create an expired session with correct field names
-        past_time = timezone.now() - timezone.timedelta(hours=1)
-        UserSession.objects.create(user=user, token_hash="test_token_hash_3", expires_at=past_time)
-
-        with self.assertRaises(Exception):
-            call_command("cleanup_sessions", stdout=self.out, stderr=self.err)
-
-        output = self.out.getvalue()
-        self.assertIn("Error cleaning up sessions", output)
+            self.assertIn("Error cleaning up sessions", output)
 
 
 class TestDebugUsersCommand(TestCase):
@@ -185,49 +157,80 @@ class TestDebugUsersCommand(TestCase):
     @patch("builtins.input", return_value="")
     def test_debug_users_no_users(self, mock_input):
         """Test debug_users command with no users"""
-        call_command("debug_users", stdout=self.out, stderr=self.err)
+        with patch("django.contrib.auth.get_user_model") as mock_get_user_model:
+            mock_user_class = MagicMock()
+            mock_user_class.objects.count.return_value = 0
+            mock_user_class.objects.all.return_value = []
+            mock_get_user_model.return_value = mock_user_class
 
-        output = self.out.getvalue()
-        self.assertIn("Total users in database: 0", output)
+            call_command("debug_users", stdout=self.out, stderr=self.err)
+
+            output = self.out.getvalue()
+            self.assertIn("Total users in database: 0", output)
 
     @patch("builtins.input", return_value="")
     def test_debug_users_with_users(self, mock_input):
         """Test debug_users command with existing users"""
-        from django.contrib.auth import get_user_model
+        with patch("django.contrib.auth.get_user_model") as mock_get_user_model:
+            mock_user = MagicMock()
+            mock_user.email = "test@example.com"
+            mock_user.first_name = "Test"
+            mock_user.last_name = "User"
+            mock_user.is_active = True
+            mock_user.date_joined = timezone.now()
 
-        User = get_user_model()
+            mock_user_class = MagicMock()
+            mock_user_class.objects.count.return_value = 1
+            mock_user_class.objects.all.return_value = [mock_user]
+            mock_get_user_model.return_value = mock_user_class
 
-        user = User.objects.create_user(email="test@example.com", password="testpass", first_name="Test", last_name="User")
+            call_command("debug_users", stdout=self.out, stderr=self.err)
 
-        call_command("debug_users", stdout=self.out, stderr=self.err)
-
-        output = self.out.getvalue()
-        self.assertIn("Total users in database: 1", output)
-        self.assertIn("Email: test@example.com", output)
-        self.assertIn("First name: Test", output)
+            output = self.out.getvalue()
+            self.assertIn("Total users in database: 1", output)
+            self.assertIn("Email: test@example.com", output)
+            self.assertIn("First name: Test", output)
 
     @patch("builtins.input", return_value="test@example.com")
     def test_debug_users_email_lookup_found(self, mock_input):
         """Test debug_users command with email lookup - user found"""
-        from django.contrib.auth import get_user_model
+        with patch("django.contrib.auth.get_user_model") as mock_get_user_model:
+            mock_user = MagicMock()
+            mock_user.email = "test@example.com"
+            mock_user.first_name = "Test"
+            mock_user.last_name = "User"
+            mock_user.is_active = True
+            mock_user.date_joined = timezone.now()
+            mock_user.check_password.return_value = True
 
-        User = get_user_model()
+            mock_user_class = MagicMock()
+            mock_user_class.objects.count.return_value = 1
+            mock_user_class.objects.all.return_value = [mock_user]
+            mock_user_class.objects.get.return_value = mock_user
+            mock_get_user_model.return_value = mock_user_class
 
-        user = User.objects.create_user(email="test@example.com", password="testpass", first_name="Test", last_name="User")
+            call_command("debug_users", stdout=self.out, stderr=self.err)
 
-        call_command("debug_users", stdout=self.out, stderr=self.err)
-
-        output = self.out.getvalue()
-        self.assertIn("Found user:", output)
-        self.assertIn("Password check available:", output)
+            output = self.out.getvalue()
+            self.assertIn("Found user:", output)
+            self.assertIn("Password check available:", output)
 
     @patch("builtins.input", return_value="notfound@example.com")
     def test_debug_users_email_lookup_not_found(self, mock_input):
         """Test debug_users command with email lookup - user not found"""
-        call_command("debug_users", stdout=self.out, stderr=self.err)
+        from django.contrib.auth.models import User
 
-        output = self.out.getvalue()
-        self.assertIn("User with email 'notfound@example.com' not found", output)
+        with patch("django.contrib.auth.get_user_model") as mock_get_user_model:
+            mock_user_class = MagicMock()
+            mock_user_class.objects.count.return_value = 0
+            mock_user_class.objects.all.return_value = []
+            mock_user_class.objects.get.side_effect = User.DoesNotExist()
+            mock_get_user_model.return_value = mock_user_class
+
+            call_command("debug_users", stdout=self.out, stderr=self.err)
+
+            output = self.out.getvalue()
+            self.assertIn("User with email 'notfound@example.com' not found", output)
 
 
 class TestMigrateToAuthSchemaCommand(TestCase):

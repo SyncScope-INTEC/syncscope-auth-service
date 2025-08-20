@@ -67,11 +67,11 @@ jobs:
           ALLOWED_HOSTS: "localhost,127.0.0.1"
           CORS_ALLOWED_ORIGINS: "http://localhost:3000"
         run: |
-          # Verify database connection and settings
-          python manage.py setup_ci_db
-
-          # Run migrations to create all required tables
-          python manage.py migrate
+          # Set up database for CI with enhanced error handling
+          python manage.py setup_ci_db --force-public-schema --run-migrations
+          
+          # Verify the setup worked
+          python manage.py check_db_health --retry-count=3
 
       - name: Run linting
         run: |

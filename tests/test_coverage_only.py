@@ -229,8 +229,15 @@ class TestCoverageSerializers(TestCase):
 
         data = {"old_password": "old", "new_password": "new123", "new_password_confirm": "different123"}
 
-        serializer = PasswordChangeSerializer(data=data)
+        # Create mock request with user
+        mock_request = MagicMock()
+        mock_user = MagicMock()
+        mock_user.check_password.return_value = True
+        mock_request.user = mock_user
+
+        serializer = PasswordChangeSerializer(data=data, context={"request": mock_request})
         self.assertFalse(serializer.is_valid())
+        self.assertIn("New passwords don't match", str(serializer.errors))
 
 
 class TestCoverageViews(TestCase):

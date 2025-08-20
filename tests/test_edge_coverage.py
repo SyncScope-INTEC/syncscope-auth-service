@@ -23,6 +23,8 @@ class TestMissingEdgeCases(TestCase):
 
     def test_password_change_old_password_validation(self):
         """Test old password validation in PasswordChangeSerializer"""
+        from rest_framework.serializers import ValidationError
+
         from apps.authentication.serializers import PasswordChangeSerializer
 
         # Mock request with user that returns False for check_password
@@ -33,7 +35,7 @@ class TestMissingEdgeCases(TestCase):
 
         serializer = PasswordChangeSerializer(context={"request": mock_request})
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             serializer.validate_old_password("wrong_password")
 
     def test_api_home_template_exception_handling(self):
