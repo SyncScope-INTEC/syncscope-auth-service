@@ -24,7 +24,13 @@ class TestRegisterView(APITestCase):
 
     def test_register_success(self):
         """Test successful user registration"""
-        data = {"email": "test@example.com", "password": "testpass123", "password_confirm": "testpass123", "first_name": "Test", "last_name": "User"}
+        data = {
+            "email": "test@example.com",
+            "password": "testpass123",
+            "password_confirm": "testpass123",
+            "first_name": "Test",
+            "last_name": "User",
+        }
 
         response = self.client.post(self.url, data)
 
@@ -55,7 +61,13 @@ class TestRegisterView(APITestCase):
         """Test registration with duplicate email"""
         User.objects.create_user(email="test@example.com", password="testpass123", first_name="Existing", last_name="User")
 
-        data = {"email": "test@example.com", "password": "testpass123", "password_confirm": "testpass123", "first_name": "Test", "last_name": "User"}
+        data = {
+            "email": "test@example.com",
+            "password": "testpass123",
+            "password_confirm": "testpass123",
+            "first_name": "Test",
+            "last_name": "User",
+        }
 
         response = self.client.post(self.url, data)
 
