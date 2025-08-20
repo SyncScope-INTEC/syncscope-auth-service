@@ -100,11 +100,11 @@ class TestSetupCiDbCommand(TestCase):
         with patch("apps.authentication.management.commands.setup_ci_db.connection") as mock_connection:
             mock_cursor = MagicMock()
             mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
-            
+
             # Mock the database connection check
             mock_cursor.fetchone.return_value = (1,)
             mock_cursor.fetchall.return_value = [("users",), ("user_sessions",), ("companies",)]
-            
+
             self.command.create_auth_schema()
             output = self.out.getvalue()
 
