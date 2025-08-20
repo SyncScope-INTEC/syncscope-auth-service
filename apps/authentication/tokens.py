@@ -35,7 +35,7 @@ class SecureRefreshToken(RefreshToken):
 
         # Add password hash for token invalidation on password change
         if hasattr(user, "password") and user.password:
-            password_hash = hashlib.md5(user.password.encode()).hexdigest()
+            password_hash = hashlib.md5(user.password.encode()).hexdigest().upper()
             token["password_hash"] = password_hash
 
         return token
@@ -66,9 +66,9 @@ class SecureRefreshToken(RefreshToken):
                 return True  # Skip check if data not available
 
             user = User.objects.get(id=user_id)
-            current_hash = hashlib.md5(user.password.encode()).hexdigest()
+            current_hash = hashlib.md5(user.password.encode()).hexdigest().upper()
 
-            return stored_hash == current_hash
+            return stored_hash.upper() == current_hash
         except User.DoesNotExist:
             return False
 
@@ -92,7 +92,7 @@ class SecureAccessToken(AccessToken):
 
         # Add password hash for token invalidation on password change
         if hasattr(user, "password") and user.password:
-            password_hash = hashlib.md5(user.password.encode()).hexdigest()
+            password_hash = hashlib.md5(user.password.encode()).hexdigest().upper()
             token["password_hash"] = password_hash
 
         return token

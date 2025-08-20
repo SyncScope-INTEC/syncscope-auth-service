@@ -3,6 +3,7 @@ Django settings for syncscope-auth-service project.
 """
 
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 

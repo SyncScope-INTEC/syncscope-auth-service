@@ -33,18 +33,28 @@ class SecureJWTAuthentication(JWTAuthentication):
                 raise InvalidToken("User is inactive")
 
             # Check if password has been changed (invalidate token if so)
+            # This is a graceful check - if password_hash is missing, we don't fail
+            # but if it's present and doesn't match, we invalidate the token
             stored_hash = validated_token.get("password_hash")
             if stored_hash and hasattr(user, "password") and user.password:
                 current_hash = hashlib.md5(user.password.encode()).hexdigest()
-                if stored_hash != current_hash:
+                # Compare hashes in lowercase to handle case sensitivity
+                if stored_hash.lower() != current_hash.lower():
                     raise InvalidToken("The user's password has been changed")
 
             return user
 
         except User.DoesNotExist:
             raise InvalidToken("User not found")
+        except InvalidToken:
+            # Re-raise InvalidToken exceptions as-is
+            raise
         except Exception as e:
-            raise InvalidToken(f"Token validation failed: {str(e)}")
+            import logging
+
+            logger = logging.getLogger("apps.authentication")
+            logger.error(f"Unexpected error during token validation: {str(e)}")
+            raise InvalidToken("Token validation failed")
 
     def authenticate(self, request):
         """
