@@ -13,7 +13,7 @@ updates:
     # Enable security updates
     open-pull-requests-limit: 10
     assignees:
-      - "SyncScope-INTEC"
+      - "AlejandroBeltre"
     commit-message:
       prefix: "deps:"
       include: "scope"
@@ -53,7 +53,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 5
     assignees:
-      - "SyncScope-INTEC"
+      - "AlejandroBeltre"
     commit-message:
       prefix: "ci:"
       include: "scope"
@@ -68,7 +68,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 5
     assignees:
-      - "SyncScope-INTEC"
+      - "AlejandroBeltre"
     commit-message:
       prefix: "docker:"
       include: "scope"
