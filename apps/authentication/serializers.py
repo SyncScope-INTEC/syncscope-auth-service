@@ -3,17 +3,17 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Company, User, UserSession
+from .models import Company, SupervisedUser, User, UserSession
 
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
-        fields = ["id", "name", "domain", "created_at"]
-        read_only_fields = ["id", "created_at"]
+        fields = ["id", "name", "domain", "industry", "size", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate_domain(self, value):
-        if not value.startswith("@"):
+        if value and not value.startswith("@"):
             value = f"@{value}"
         return value
 
@@ -104,20 +104,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "role",
             "timezone",
             "company",
-            "avatar_url",
-            "is_verified",
             "created_at",
             "updated_at",
             "date_joined",
             "is_active",
         ]
-        read_only_fields = ["id", "email", "is_verified", "created_at", "updated_at"]
+        read_only_fields = ["id", "email", "created_at", "updated_at"]
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "avatar_url", "timezone"]
+        fields = ["first_name", "last_name", "timezone"]
 
     def validate_first_name(self, value):
         if not value or not value.strip():
@@ -167,5 +165,53 @@ class UserSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserSession
-        fields = ["id", "user", "created_at", "expires_at", "is_active", "user_agent", "ip_address", "last_used"]
+        fields = ["id", "user", "created_at", "expires_at", "user_agent", "ip_address"]
         read_only_fields = fields
+
+
+class SupervisedUserSerializer(serializers.ModelSerializer):
+    user = UserProfileSerializer(read_only=True)
+    supervisor = UserProfileSerializer(read_only=True)
+
+    class Meta:
+        model = SupervisedUser
+        fields = ["id", "user", "supervisor", "monitoring_enabled", "agent_last_heartbeat", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "agent_last_heartbeat"]
+
+
+class SupervisedUserCreateSerializer(serializers.ModelSerializer):
+    user_id = serializers.UUIDField(write_only=True)
+    supervisor_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = SupervisedUser
+        fields = ["user_id", "supervisor_id", "monitoring_enabled"]
+
+    def validate(self, attrs):
+        user_id = attrs.get("user_id")
+        supervisor_id = attrs.get("supervisor_id")
+
+        if user_id == supervisor_id:
+            raise serializers.ValidationError("A user cannot supervise themselves")
+
+        try:
+            user = User.objects.get(id=user_id)
+            supervisor = User.objects.get(id=supervisor_id)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid user or supervisor")
+
+        if supervisor.role not in ["admin", "supervisor"]:
+            raise serializers.ValidationError("Supervisor must have admin or supervisor role")
+
+        # Check if relationship already exists
+        if SupervisedUser.objects.filter(user=user, supervisor=supervisor).exists():
+            raise serializers.ValidationError("This supervision relationship already exists")
+
+        attrs["user"] = user
+        attrs["supervisor"] = supervisor
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("user_id")
+        validated_data.pop("supervisor_id")
+        return super().create(validated_data)

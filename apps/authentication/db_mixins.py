@@ -104,7 +104,7 @@ class RetryableUserManager(BaseUserManager):
         email = self.normalize_email(email)
 
         # Set default values for optional fields if not provided
-        extra_fields.setdefault("is_verified", False)
+        # Removed is_verified field
 
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
@@ -117,7 +117,7 @@ class RetryableUserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
 
         # Set default values for superuser
-        extra_fields.setdefault("is_verified", True)
+        # Removed is_verified field
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")

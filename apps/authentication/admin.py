@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Company, User, UserSession
+from .models import Company, SupervisedUser, User, UserSession
 
 
 @admin.register(Company)
@@ -42,22 +42,30 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(UserSession)
 class UserSessionAdmin(admin.ModelAdmin):
-    list_display = ["user", "is_active", "created_at", "expires_at", "last_used", "ip_address"]
-    list_filter = ["is_active", "created_at", "expires_at"]
+    list_display = ["user", "created_at", "expires_at", "ip_address"]
+    list_filter = ["created_at", "expires_at"]
     search_fields = ["user__email", "user__first_name", "user__last_name", "ip_address"]
-    readonly_fields = ["id", "token_hash", "created_at", "last_used"]
+    readonly_fields = ["id", "token_hash", "created_at"]
     ordering = ["-created_at"]
 
     fieldsets = (
-        (None, {"fields": ("id", "user", "is_active")}),
+        (None, {"fields": ("id", "user")}),
         ("Session info", {"fields": ("token_hash", "user_agent", "ip_address")}),
-        ("Timestamps", {"fields": ("created_at", "expires_at", "last_used")}),
+        ("Timestamps", {"fields": ("created_at", "expires_at")}),
     )
 
-    actions = ["deactivate_sessions"]
 
-    def deactivate_sessions(self, request, queryset):
-        queryset.update(is_active=False)
-        self.message_user(request, f"{queryset.count()} sessions deactivated.")
+@admin.register(SupervisedUser)
+class SupervisedUserAdmin(admin.ModelAdmin):
+    list_display = ["user", "supervisor", "monitoring_enabled", "created_at"]
+    list_filter = ["monitoring_enabled", "created_at"]
+    search_fields = ["user__email", "user__first_name", "supervisor__email", "supervisor__first_name"]
+    readonly_fields = ["id", "created_at", "updated_at", "agent_last_heartbeat"]
+    ordering = ["-created_at"]
 
-    deactivate_sessions.short_description = "Deactivate selected sessions"
+    fieldsets = (
+        (None, {"fields": ("id", "user", "supervisor")}),
+        ("Monitoring", {"fields": ("monitoring_enabled", "agent_token", "agent_config")}),
+        ("Status", {"fields": ("agent_last_heartbeat",)}),
+        ("Timestamps", {"fields": ("created_at", "updated_at")}),
+    )

@@ -117,15 +117,17 @@ db_options = {
 }
 
 # Schema configuration
-# This auth service should always use the auth schema
-# Django admin needs access to both schemas
+# This auth service works primarily with the auth schema
+# But also needs access to other schemas for relationships
 use_auth_schema = (
     "test" not in config("DB_NAME", default="").lower() and "test" not in os.environ.get("DATABASE_URL", "").lower()
 )
 
 if use_auth_schema:
-    # Prioritize auth schema over public schema
-    db_options["options"] = "-c search_path=auth,public -c statement_timeout=30000"
+    # Set search path to include all schemas with auth as priority
+    db_options["options"] = (
+        "-c search_path=auth,management,monitoring,alerts,analytics,audit,public -c statement_timeout=30000"
+    )
 else:
     db_options["options"] = "-c statement_timeout=30000"
 

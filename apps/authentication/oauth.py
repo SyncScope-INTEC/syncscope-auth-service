@@ -57,74 +57,16 @@ def get_github_user_data(access_token):
         "login": user_data["login"],
         "email": primary_email,
         "name": user_data.get("name", ""),
-        "avatar_url": user_data.get("avatar_url"),
+        # "avatar_url": user_data.get("avatar_url"),  # Deprecated field
         "company": user_data.get("company"),
     }
 
 
 def create_or_update_user_from_github(github_data):
     """Create or update user from GitHub data"""
-    github_id = str(github_data["id"])
-    email = github_data["email"]
-
-    if not email:
-        raise ValueError("GitHub account must have a public email")
-
-    email = email.lower()
-    domain = extract_domain_from_email(email)
-    name = github_data.get("name", "") or ""
-    if name:
-        name_parts = name.split(" ", 1)
-        first_name = name_parts[0]
-        last_name = name_parts[1] if len(name_parts) > 1 else "."
-    else:
-        first_name = github_data["login"]
-        last_name = "."
-
-    try:
-        user = User.objects.get(github_id=github_id)
-        user.email = email
-        user.first_name = first_name
-        user.last_name = last_name
-        user.avatar_url = github_data.get("avatar_url")
-        user.is_verified = True
-        user.save()
-        return user
-    except User.DoesNotExist:
-        pass
-
-    try:
-        user = User.objects.get(email=email)
-        user.github_id = github_id
-        user.first_name = first_name
-        user.last_name = last_name
-        user.avatar_url = github_data.get("avatar_url")
-        user.is_verified = True
-        if github_data.get("company"):
-            company, _ = Company.objects.get_or_create(name=github_data["company"], defaults={"domain": domain})
-            user.company = company
-        user.save()
-        return user
-    except User.DoesNotExist:
-        pass
-
-    company = None
-
-    if github_data.get("company"):
-        company, _ = Company.objects.get_or_create(name=github_data["company"], defaults={"domain": domain})
-
-    user = User.objects.create_user(
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-        github_id=github_id,
-        avatar_url=github_data.get("avatar_url"),
-        company=company,
-        is_verified=True,
-        password=None,
-    )
-
-    return user
+    # DISABLED: OAuth functionality uses deprecated fields (github_id, avatar_url, is_verified)
+    # This function is disabled until OAuth can be updated to work without deprecated fields
+    raise ValueError("GitHub OAuth is currently disabled due to deprecated field dependencies")
 
 
 @api_view(["POST"])

@@ -18,9 +18,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from config.database_retry import atomic_with_retry
 
 from .db_mixins import ServerlessViewMixin
-from .models import User, UserSession
+from .models import SupervisedUser, User, UserSession
 from .serializers import (
     PasswordChangeSerializer,
+    SupervisedUserCreateSerializer,
+    SupervisedUserSerializer,
     UserLoginSerializer,
     UserProfileSerializer,
     UserRegistrationSerializer,
@@ -216,7 +218,7 @@ class UserSessionsView(ServerlessViewMixin, APIView):
 
     def get(self, request):
         """Get user's active sessions"""
-        sessions = UserSession.objects.filter(user=request.user, is_active=True, expires_at__gt=timezone.now())
+        sessions = UserSession.objects.filter(user=request.user, expires_at__gt=timezone.now())
         serializer = UserSessionSerializer(sessions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -231,8 +233,8 @@ class UserSessionsView(ServerlessViewMixin, APIView):
 
                 uuid.UUID(session_id)
 
-                session = UserSession.objects.get(id=session_id, user=request.user, is_active=True)
-                session.deactivate()
+                session = UserSession.objects.get(id=session_id, user=request.user)
+                session.delete()
                 return Response({"message": "Session terminated"}, status=status.HTTP_200_OK)
             except (ValueError, UserSession.DoesNotExist):
                 return Response({"error": "Session not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -318,3 +320,144 @@ def api_home(request):
     except:
         # Fallback to JSON response if template doesn't exist
         return Response(context, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Supervision"],
+        summary="List supervised users",
+        description="Get list of users supervised by the current user or all supervised users if admin.",
+    ),
+    post=extend_schema(
+        tags=["Supervision"],
+        summary="Create supervision relationship",
+        description="Create a new supervisor-supervised user relationship.",
+        request=SupervisedUserCreateSerializer,
+    ),
+)
+class SupervisedUserListCreateView(ServerlessViewMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Get supervised users based on user role"""
+        user = request.user
+
+        if user.role == "admin":
+            # Admins can see all supervised relationships in their company
+            supervised_users = SupervisedUser.objects.filter(supervisor__company=user.company).select_related(
+                "user", "supervisor"
+            )
+        elif user.role == "supervisor":
+            # Supervisors can see their own supervised users
+            supervised_users = SupervisedUser.objects.filter(supervisor=user).select_related("user", "supervisor")
+        else:
+            # Developers can see their own supervision relationships
+            supervised_users = SupervisedUser.objects.filter(user=user).select_related("user", "supervisor")
+
+        serializer = SupervisedUserSerializer(supervised_users, many=True)
+        return Response(serializer.data)
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Create a new supervision relationship"""
+        user = request.user
+
+        # Only admins and supervisors can create supervision relationships
+        if user.role not in ["admin", "supervisor"]:
+            return Response(
+                {"error": "Only admins and supervisors can create supervision relationships"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = SupervisedUserCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            supervised_user = serializer.save()
+            response_serializer = SupervisedUserSerializer(supervised_user)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Supervision"],
+        summary="Get supervision relationship",
+        description="Get details of a specific supervision relationship.",
+    ),
+    put=extend_schema(
+        tags=["Supervision"],
+        summary="Update supervision relationship",
+        description="Update monitoring settings for a supervision relationship.",
+    ),
+    delete=extend_schema(
+        tags=["Supervision"],
+        summary="Delete supervision relationship",
+        description="Remove a supervision relationship.",
+    ),
+)
+class SupervisedUserDetailView(ServerlessViewMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, pk, user):
+        """Get supervision relationship with permission checking"""
+        try:
+            supervised_user = SupervisedUser.objects.select_related("user", "supervisor").get(pk=pk)
+
+            # Check permissions
+            if user.role == "admin" and user.company == supervised_user.supervisor.company:
+                return supervised_user
+            elif user.role == "supervisor" and user == supervised_user.supervisor:
+                return supervised_user
+            elif user == supervised_user.user:
+                return supervised_user
+            else:
+                return None
+
+        except SupervisedUser.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        """Get supervision relationship details"""
+        supervised_user = self.get_object(pk, request.user)
+        if not supervised_user:
+            return Response({"error": "Supervision relationship not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = SupervisedUserSerializer(supervised_user)
+        return Response(serializer.data)
+
+    @atomic_with_retry()
+    def put(self, request, pk):
+        """Update supervision relationship"""
+        supervised_user = self.get_object(pk, request.user)
+        if not supervised_user:
+            return Response({"error": "Supervision relationship not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Only supervisors and admins can update
+        if request.user.role not in ["admin", "supervisor"]:
+            return Response(
+                {"error": "Only supervisors and admins can update supervision relationships"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Only allow updating monitoring_enabled field
+        monitoring_enabled = request.data.get("monitoring_enabled")
+        if monitoring_enabled is not None:
+            supervised_user.monitoring_enabled = monitoring_enabled
+            supervised_user.save()
+
+        serializer = SupervisedUserSerializer(supervised_user)
+        return Response(serializer.data)
+
+    @atomic_with_retry()
+    def delete(self, request, pk):
+        """Delete supervision relationship"""
+        supervised_user = self.get_object(pk, request.user)
+        if not supervised_user:
+            return Response({"error": "Supervision relationship not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Only supervisors and admins can delete
+        if request.user.role not in ["admin", "supervisor"]:
+            return Response(
+                {"error": "Only supervisors and admins can delete supervision relationships"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        supervised_user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -4,7 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.authentication.models import Company, UserSession
+from apps.authentication.models import Company, SupervisedUser, UserSession
 
 User = get_user_model()
 
@@ -98,7 +98,7 @@ class TestAuthenticationAPI:
         assert session_token is not None
 
         # Verify session exists in database
-        user_sessions = UserSession.objects.filter(user=user, is_active=True)
+        user_sessions = UserSession.objects.filter(user=user)
         assert user_sessions.exists()
 
         # Check user fields in response
@@ -332,10 +332,10 @@ class TestSessionAPI:
         # Find our specific session in the response
         session_data = next((s for s in response.data if s["id"] == str(session.id)), None)
         assert session_data is not None
-        assert session_data["is_active"] is True
+        # Removed is_active field check
         assert session_data["user_agent"] is not None
         assert "created_at" in session_data
-        assert "last_used" in session_data
+        # Removed last_used field check
         assert "expires_at" in session_data
 
     def test_terminate_specific_session(self, authenticated_client, user, user_session):
@@ -349,16 +349,16 @@ class TestSessionAPI:
         assert response.status_code == status.HTTP_200_OK
         assert "Session terminated" in response.data["message"]
 
-        # Check session was deactivated
-        session.refresh_from_db()
-        assert session.is_active is False
+        # Check session was deleted
+        with pytest.raises(UserSession.DoesNotExist):
+            session.refresh_from_db()
 
     def test_terminate_all_sessions(self, authenticated_client, user):
         # Create multiple sessions for the user
         UserSession.objects.create(user=user, token_hash="session1_hash")
         UserSession.objects.create(user=user, token_hash="session2_hash")
 
-        initial_active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
+        initial_active_sessions = UserSession.objects.filter(user=user).count()
         assert initial_active_sessions >= 2
 
         url = reverse("user_sessions")
@@ -370,7 +370,7 @@ class TestSessionAPI:
         assert "All sessions terminated" in response.data["message"]
 
         # Check all sessions were deactivated
-        active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
+        active_sessions = UserSession.objects.filter(user=user).count()
         assert active_sessions == 0
 
     def test_session_details_in_response(self, authenticated_client, user):
@@ -393,7 +393,7 @@ class TestSessionAPI:
         assert "token_hash" not in session_data
 
         # Check that appropriate fields are included
-        expected_fields = ["id", "created_at", "last_used", "expires_at", "is_active", "user_agent"]
+        expected_fields = ["id", "created_at", "expires_at", "user_agent"]
         for field in expected_fields:
             assert field in session_data
 

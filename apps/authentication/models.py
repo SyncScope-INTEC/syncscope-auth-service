@@ -13,8 +13,10 @@ from .db_mixins import RetryableManager, RetryableModelMixin, RetryableUserManag
 
 class Company(RetryableModelMixin, models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255, unique=True)
-    domain = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
+    domain = models.CharField(max_length=255, null=True, blank=True)
+    industry = models.CharField(max_length=100, null=True, blank=True)
+    size = models.CharField(max_length=50, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -38,27 +40,30 @@ class Company(RetryableModelMixin, models.Model):
 class User(RetryableModelMixin, AbstractUser):
     ROLE_CHOICES = [
         ("admin", "Admin"),
+        ("supervisor", "Supervisor"),
         ("developer", "Developer"),
-        ("manager", "Manager"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, validators=[EmailValidator()])
     password = models.CharField(max_length=255, db_column="password_hash")
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="developer")
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="users", null=True, blank=True)
-    first_name = models.CharField(max_length=150)
-    last_name = models.CharField(max_length=150)
+    first_name = models.CharField(max_length=100, null=True, blank=True)
+    last_name = models.CharField(max_length=100, null=True, blank=True)
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="developer")
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="users", null=True, blank=True, db_column="company_id"
+    )
+    is_active = models.BooleanField(default=True)
+    timezone = models.CharField(max_length=50, default="UTC")
     date_joined = models.DateTimeField(auto_now_add=True, db_column="created_at")
     updated_at = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True)
+    last_login = models.DateTimeField(null=True, blank=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
-    last_login = models.DateTimeField(null=True, blank=True)
-    timezone = models.CharField(max_length=50, default="UTC")
-    is_verified = models.BooleanField(default=False)
-    github_id = models.CharField(max_length=50, null=True, blank=True, unique=True)
-    avatar_url = models.URLField(max_length=500, null=True, blank=True)
+    # Remove fields that aren't in the new schema
+    # is_verified = models.BooleanField(default=False)
+    # github_id = models.CharField(max_length=50, null=True, blank=True, unique=True)
+    # avatar_url = models.URLField(max_length=500, null=True, blank=True)
 
     username = None
     USERNAME_FIELD = "email"
@@ -102,14 +107,12 @@ class User(RetryableModelMixin, AbstractUser):
 
 class UserSession(RetryableModelMixin, models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions")
-    token_hash = models.CharField(max_length=255, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
-    is_active = models.BooleanField(default=True)
-    user_agent = models.TextField(blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions", db_column="user_id")
+    token_hash = models.CharField(max_length=255)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    last_used = models.DateTimeField(auto_now=True)
+    user_agent = models.TextField(blank=True, null=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
     objects = RetryableManager()
 
@@ -117,7 +120,7 @@ class UserSession(RetryableModelMixin, models.Model):
         db_table = "user_sessions"
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "is_active"]),
+            models.Index(fields=["user"]),
             models.Index(fields=["token_hash"]),
             models.Index(fields=["expires_at"]),
         ]
@@ -134,10 +137,7 @@ class UserSession(RetryableModelMixin, models.Model):
     def is_expired(self):
         return timezone.now() > self.expires_at
 
-    @atomic_with_retry()
-    def deactivate(self):
-        self.is_active = False
-        self.save()
+    # Removed deactivate() method - sessions are now deleted instead of deactivated
 
     @classmethod
     @atomic_with_retry()
@@ -148,9 +148,53 @@ class UserSession(RetryableModelMixin, models.Model):
     @atomic_with_retry()
     def get_active_session(cls, token_hash):
         try:
-            session = cls.objects.get(token_hash=token_hash, is_active=True, expires_at__gt=timezone.now())
-            session.last_used = timezone.now()
-            session.save()
+            session = cls.objects.get(token_hash=token_hash, expires_at__gt=timezone.now())
             return session
         except cls.DoesNotExist:
             return None
+
+
+class SupervisedUser(RetryableModelMixin, models.Model):
+    """
+    Critical model for supervisor-supervised user relationships
+    This was missing from the current implementation
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="supervised_relationships", db_column="user_id")
+    supervisor = models.ForeignKey(User, on_delete=models.CASCADE, related_name="supervised_users", db_column="supervisor_id")
+    agent_token = models.CharField(max_length=255, null=True, blank=True)
+    agent_last_heartbeat = models.DateTimeField(null=True, blank=True)
+    agent_config = models.JSONField(null=True, blank=True)
+    monitoring_enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = RetryableManager()
+
+    class Meta:
+        db_table = "supervised_users"
+        ordering = ["-created_at"]
+        unique_together = ["user", "supervisor"]
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["supervisor"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.full_name} supervised by {self.supervisor.full_name}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.user == self.supervisor:
+            raise ValidationError("A user cannot supervise themselves")
+
+        # Ensure supervisor has supervisor role
+        if self.supervisor.role not in ["admin", "supervisor"]:
+            raise ValidationError("Supervisor must have admin or supervisor role")
+
+    @atomic_with_retry()
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

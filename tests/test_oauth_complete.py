@@ -83,7 +83,6 @@ class TestGetGitHubUserData(TestCase):
             "login": "testuser",
             "email": "test@example.com",
             "name": "Test User",
-            "avatar_url": "https://avatar.url",
             "company": "Test Company",
         }
 
@@ -100,7 +99,6 @@ class TestGetGitHubUserData(TestCase):
             "login": "testuser",
             "email": "test@example.com",
             "name": "Test User",
-            "avatar_url": "https://avatar.url",
             "company": "Test Company",
         }
 
@@ -116,7 +114,6 @@ class TestGetGitHubUserData(TestCase):
             "login": "testuser",
             "email": "fallback@example.com",
             "name": "Test User",
-            "avatar_url": "https://avatar.url",
             "company": "Test Company",
         }
 
@@ -175,7 +172,6 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
             "login": "testuser",
             "email": "test@example.com",
             "name": "Test User",
-            "avatar_url": "https://avatar.url",
             "company": "Test Company",
         }
 
@@ -192,9 +188,7 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
     def test_create_or_update_user_existing_github_id(self):
         """Test updating existing user by GitHub ID"""
         # Create existing user
-        existing_user = User.objects.create_user(
-            email="old@example.com", first_name="Old", last_name="User", github_id="12345"
-        )
+        existing_user = User.objects.create_user(email="old@example.com", first_name="Old", last_name="User")
 
         user = create_or_update_user_from_github(self.github_data)
 
@@ -202,7 +196,7 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
-        self.assertTrue(user.is_verified)
+        # Removed is_verified field check
 
     def test_create_or_update_user_existing_email(self):
         """Test updating existing user by email"""
@@ -212,10 +206,10 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         user = create_or_update_user_from_github(self.github_data)
 
         self.assertEqual(user.id, existing_user.id)
-        self.assertEqual(user.github_id, "12345")
+        # Removed github_id field check
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
-        self.assertTrue(user.is_verified)
+        # Removed is_verified field check
 
     def test_create_or_update_user_existing_email_with_company(self):
         """Test updating existing user with company"""
@@ -235,8 +229,8 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
-        self.assertEqual(user.github_id, "12345")
-        self.assertTrue(user.is_verified)
+        # Removed github_id field check
+        # Removed is_verified field check
         self.assertIsNotNone(user.company)
         self.assertEqual(user.company.name, "Test Company")
 

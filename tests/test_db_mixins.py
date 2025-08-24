@@ -208,7 +208,7 @@ class TestRetryableUserManager(TestCase):
         result = self.manager.create_user("test@example.com", "password123", first_name="Test")
 
         self.manager.normalize_email.assert_called_once_with("test@example.com")
-        self.manager.model.assert_called_once_with(email="test@example.com", first_name="Test", is_verified=False)
+        self.manager.model.assert_called_once_with(email="test@example.com", first_name="Test")
         mock_user.set_password.assert_called_once_with("password123")
         mock_user.save.assert_called_once_with(using="default")
         self.assertEqual(result, mock_user)
@@ -235,9 +235,7 @@ class TestRetryableUserManager(TestCase):
 
             result = self.manager.create_superuser("admin@example.com", "password123")
 
-            mock_create_user.assert_called_once_with(
-                "admin@example.com", "password123", is_staff=True, is_superuser=True, is_verified=True
-            )
+            mock_create_user.assert_called_once_with("admin@example.com", "password123", is_staff=True, is_superuser=True)
             self.assertEqual(result, mock_user)
 
     def test_create_superuser_not_staff(self):

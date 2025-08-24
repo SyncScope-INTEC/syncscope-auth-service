@@ -57,10 +57,10 @@ def get_tokens_for_user(user):
 
 def invalidate_user_sessions(user, exclude_session_id=None):
     """Invalidate all user sessions except optionally one"""
-    sessions = user.sessions.filter(is_active=True)
+    sessions = user.sessions.all()
     if exclude_session_id:
         sessions = sessions.exclude(id=exclude_session_id)
-    sessions.update(is_active=False)
+    sessions.delete()
 
 
 def cleanup_expired_sessions():

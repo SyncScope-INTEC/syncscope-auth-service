@@ -6,14 +6,14 @@ from django.conf import settings
 
 # Configure Django settings before importing anything else
 if not settings.configured:
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.test_settings")
     django.setup()
 
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.authentication.models import Company, UserSession
+from apps.authentication.models import Company, SupervisedUser, UserSession
 
 User = get_user_model()
 
@@ -25,7 +25,7 @@ def api_client():
 
 @pytest.fixture
 def company():
-    return Company.objects.create(name="Test Company", domain="@testcompany.com")
+    return Company.objects.create(name="Test Company", domain="@testcompany.com", industry="Technology", size="Small")
 
 
 @pytest.fixture
@@ -61,18 +61,18 @@ def admin_user(company):
 
 
 @pytest.fixture
-def github_user():
+def supervisor_user(company):
     return User.objects.create_user(
-        email="githubuser@example.com",
-        first_name="GitHub",
+        email="supervisor@testcompany.com",
+        password="supervisorpassword123",
+        first_name="Supervisor",
         last_name="User",
-        password=None,
-        role="developer",
+        role="supervisor",
+        company=company,
         timezone="UTC",
         is_active=True,
         is_staff=False,
         is_superuser=False,
-        github_id="123456",
     )
 
 
@@ -88,6 +88,18 @@ def admin_authenticated_client(api_client, admin_user):
     refresh = RefreshToken.for_user(admin_user)
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
+
+
+@pytest.fixture
+def supervisor_authenticated_client(api_client, supervisor_user):
+    refresh = RefreshToken.for_user(supervisor_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return api_client
+
+
+@pytest.fixture
+def supervised_user_relationship(user, supervisor_user):
+    return SupervisedUser.objects.create(user=user, supervisor=supervisor_user, monitoring_enabled=True)
 
 
 @pytest.fixture
