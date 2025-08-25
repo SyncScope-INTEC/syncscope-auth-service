@@ -89,8 +89,17 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
 DATABASE_URL = config("DATABASE_URL", default=None)
+USE_SQLITE = config("USE_SQLITE", default=False, cast=bool)
 
-if DATABASE_URL:
+if USE_SQLITE:
+    # Use SQLite for local development
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+elif DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
@@ -110,30 +119,31 @@ else:
         }
     }
 
-# Database connection configuration for serverless
-db_options = {
-    "connect_timeout": 10,
-    "application_name": "syncscope-auth-serverless",
-}
+# Database connection configuration for PostgreSQL only
+if not USE_SQLITE:
+    db_options = {
+        "connect_timeout": 10,
+        "application_name": "syncscope-auth-serverless",
+    }
 
-# Schema configuration
-# This auth service works primarily with the auth schema
-# But also needs access to other schemas for relationships
-use_auth_schema = (
-    "test" not in config("DB_NAME", default="").lower() and "test" not in os.environ.get("DATABASE_URL", "").lower()
-)
-
-if use_auth_schema:
-    # Set search path to include all schemas with auth as priority
-    db_options["options"] = (
-        "-c search_path=auth,management,monitoring,alerts,analytics,audit,public -c statement_timeout=30000"
+    # Schema configuration
+    # This auth service works primarily with the auth schema
+    # But also needs access to other schemas for relationships
+    use_auth_schema = (
+        "test" not in config("DB_NAME", default="").lower() and "test" not in os.environ.get("DATABASE_URL", "").lower()
     )
-else:
-    db_options["options"] = "-c statement_timeout=30000"
 
-DATABASES["default"].update(
-    {"CONN_MAX_AGE": 0, "CONN_HEALTH_CHECKS": True, "OPTIONS": db_options}  # Don't persist connections in serverless
-)
+    if use_auth_schema:
+        # Set search path to include all schemas with auth as priority
+        db_options["options"] = (
+            "-c search_path=auth,management,monitoring,alerts,analytics,audit,public -c statement_timeout=30000"
+        )
+    else:
+        db_options["options"] = "-c statement_timeout=30000"
+
+    DATABASES["default"].update(
+        {"CONN_MAX_AGE": 0, "CONN_HEALTH_CHECKS": True, "OPTIONS": db_options}  # Don't persist connections in serverless
+    )
 
 # Custom User Model
 AUTH_USER_MODEL = "authentication.User"

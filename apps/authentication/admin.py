@@ -43,7 +43,7 @@ class UserAdmin(BaseUserAdmin):
 @admin.register(UserSession)
 class UserSessionAdmin(admin.ModelAdmin):
     list_display = ["user", "is_active", "created_at", "expires_at", "last_used", "ip_address"]
-    list_filter = ["is_active", "created_at", "expires_at"]
+    list_filter = ["created_at", "expires_at"]
     search_fields = ["user__email", "user__first_name", "user__last_name", "ip_address"]
     readonly_fields = ["id", "token_hash", "created_at", "last_used"]
     ordering = ["-created_at"]

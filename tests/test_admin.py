@@ -150,7 +150,7 @@ class TestUserSessionAdmin:
     def test_list_filter(self):
         """Test list_filter configuration."""
         session_admin = UserSessionAdmin(UserSession, admin.site)
-        expected_filters = ["is_active", "created_at", "expires_at"]
+        expected_filters = ["created_at", "expires_at"]
         assert session_admin.list_filter == expected_filters
 
     def test_search_fields(self):
