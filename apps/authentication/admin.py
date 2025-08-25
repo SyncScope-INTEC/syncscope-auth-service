@@ -42,17 +42,40 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(UserSession)
 class UserSessionAdmin(admin.ModelAdmin):
-    list_display = ["user", "created_at", "expires_at", "ip_address"]
-    list_filter = ["created_at", "expires_at"]
+    list_display = ["user", "is_active", "created_at", "expires_at", "last_used", "ip_address"]
+    list_filter = ["is_active", "created_at", "expires_at"]
     search_fields = ["user__email", "user__first_name", "user__last_name", "ip_address"]
-    readonly_fields = ["id", "token_hash", "created_at"]
+    readonly_fields = ["id", "token_hash", "created_at", "last_used"]
     ordering = ["-created_at"]
+    actions = ["deactivate_sessions"]
 
     fieldsets = (
-        (None, {"fields": ("id", "user")}),
+        (None, {"fields": ("id", "user", "is_active")}),
         ("Session info", {"fields": ("token_hash", "user_agent", "ip_address")}),
-        ("Timestamps", {"fields": ("created_at", "expires_at")}),
+        ("Timestamps", {"fields": ("created_at", "expires_at", "last_used")}),
     )
+
+    def is_active(self, obj):
+        """Check if session is active (not expired)"""
+        from django.utils import timezone
+        return obj.expires_at > timezone.now()
+    is_active.boolean = True
+    is_active.short_description = "Active"
+
+    def last_used(self, obj):
+        """Show created_at as last_used for compatibility"""
+        return obj.created_at
+    last_used.short_description = "Last Used"
+
+    def deactivate_sessions(self, request, queryset):
+        """Deactivate selected sessions by deleting them"""
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(
+            request,
+            f"Successfully deactivated {count} session{'s' if count != 1 else ''}."
+        )
+    deactivate_sessions.short_description = "Deactivate selected sessions"
 
 
 @admin.register(SupervisedUser)

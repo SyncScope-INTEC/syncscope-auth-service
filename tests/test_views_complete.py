@@ -437,9 +437,9 @@ class TestUserSessionsView(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("message", response.data)
 
-        # Verify session was deactivated
-        session.refresh_from_db()
-        self.assertFalse(session.is_active)
+        # Verify session was deleted
+        with self.assertRaises(UserSession.DoesNotExist):
+            session.refresh_from_db()
 
     def test_delete_nonexistent_session(self):
         """Test deleting nonexistent session"""

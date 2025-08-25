@@ -224,14 +224,14 @@ class TestUserSessionAdminActions:
 
         # Create a mock queryset
         mock_queryset = Mock()
-        mock_queryset.update.return_value = None
+        mock_queryset.delete.return_value = None
         mock_queryset.count.return_value = 3
 
         # Test the action
         self.session_admin.deactivate_sessions(request, mock_queryset)
 
-        # Verify the queryset was updated
-        mock_queryset.update.assert_called_once_with(is_active=False)
+        # Verify the queryset was deleted
+        mock_queryset.delete.assert_called_once()
         mock_queryset.count.assert_called_once()
 
     @patch.object(UserSessionAdmin, "message_user")
@@ -242,14 +242,14 @@ class TestUserSessionAdminActions:
 
         # Create a mock queryset
         mock_queryset = Mock()
-        mock_queryset.update.return_value = None
+        mock_queryset.delete.return_value = None
         mock_queryset.count.return_value = 5
 
         # Test the action
         self.session_admin.deactivate_sessions(request, mock_queryset)
 
         # Verify the message was sent
-        mock_message_user.assert_called_once_with(request, "5 sessions deactivated.")
+        mock_message_user.assert_called_once_with(request, "Successfully deactivated 5 sessions.")
 
     @patch.object(UserSessionAdmin, "message_user")
     def test_deactivate_sessions_single_session_message(self, mock_message_user):
@@ -257,12 +257,12 @@ class TestUserSessionAdminActions:
         request = self.factory.post("/admin/")
 
         mock_queryset = Mock()
-        mock_queryset.update.return_value = None
+        mock_queryset.delete.return_value = None
         mock_queryset.count.return_value = 1
 
         self.session_admin.deactivate_sessions(request, mock_queryset)
 
-        mock_message_user.assert_called_once_with(request, "1 sessions deactivated.")
+        mock_message_user.assert_called_once_with(request, "Successfully deactivated 1 session.")
 
     @patch.object(UserSessionAdmin, "message_user")
     def test_deactivate_sessions_zero_sessions_message(self, mock_message_user):
@@ -270,12 +270,12 @@ class TestUserSessionAdminActions:
         request = self.factory.post("/admin/")
 
         mock_queryset = Mock()
-        mock_queryset.update.return_value = None
+        mock_queryset.delete.return_value = None
         mock_queryset.count.return_value = 0
 
         self.session_admin.deactivate_sessions(request, mock_queryset)
 
-        mock_message_user.assert_called_once_with(request, "0 sessions deactivated.")
+        mock_message_user.assert_called_once_with(request, "Successfully deactivated 0 sessions.")
 
 
 class TestAdminImports:

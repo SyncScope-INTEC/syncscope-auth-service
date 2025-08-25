@@ -128,7 +128,7 @@ class LogoutView(ServerlessViewMixin, APIView):
             if session_token:
                 session = validate_session_token(session_token)
                 if session and session.user == request.user:
-                    session.deactivate()
+                    session.delete()
             else:
                 invalidate_user_sessions(request.user)
 

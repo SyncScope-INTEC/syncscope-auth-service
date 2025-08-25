@@ -413,13 +413,13 @@ class TestUtilsConfiguration(TestCase):
         mock_user.id = 1
 
         mock_sessions = MagicMock()
-        mock_user.sessions.filter.return_value = mock_sessions
+        mock_user.sessions.all.return_value = mock_sessions
 
         invalidate_user_sessions(mock_user, exclude_session_id=123)
 
-        mock_user.sessions.filter.assert_called_once_with(is_active=True)
+        mock_user.sessions.all.assert_called_once()
         mock_sessions.exclude.assert_called_once_with(id=123)
-        mock_sessions.exclude.return_value.update.assert_called_once_with(is_active=False)
+        mock_sessions.exclude.return_value.delete.assert_called_once()
 
     def test_generate_session_token(self):
         """Test generate_session_token utility"""
