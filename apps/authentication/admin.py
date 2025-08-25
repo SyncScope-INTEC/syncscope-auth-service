@@ -58,23 +58,24 @@ class UserSessionAdmin(admin.ModelAdmin):
     def is_active(self, obj):
         """Check if session is active (not expired)"""
         from django.utils import timezone
+
         return obj.expires_at > timezone.now()
+
     is_active.boolean = True
     is_active.short_description = "Active"
 
     def last_used(self, obj):
         """Show created_at as last_used for compatibility"""
         return obj.created_at
+
     last_used.short_description = "Last Used"
 
     def deactivate_sessions(self, request, queryset):
         """Deactivate selected sessions by deleting them"""
         count = queryset.count()
         queryset.delete()
-        self.message_user(
-            request,
-            f"Successfully deactivated {count} session{'s' if count != 1 else ''}."
-        )
+        self.message_user(request, f"Successfully deactivated {count} session{'s' if count != 1 else ''}.")
+
     deactivate_sessions.short_description = "Deactivate selected sessions"
 
 
