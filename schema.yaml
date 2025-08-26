@@ -21,7 +21,7 @@ paths:
           description: No response body
   /auth/change-password/:
     post:
-      operationId: auth_change_password_create
+      operationId: change_password_create
       description: Change current user's password. Requires old password for verification.
       summary: Change password
       tags:
@@ -55,10 +55,10 @@ paths:
           description: ''
   /auth/github/callback/:
     post:
-      operationId: auth_github_callback_create
+      operationId: github_callback_create
       description: Handle GitHub OAuth callback
       tags:
-      - auth
+      - github
       security:
       - Bearer: []
       - {}
@@ -67,10 +67,10 @@ paths:
           description: No response body
   /auth/github/url/:
     get:
-      operationId: auth_github_url_retrieve
+      operationId: github_url_retrieve
       description: Get GitHub OAuth URL
       tags:
-      - auth
+      - github
       security:
       - Bearer: []
       - {}
@@ -79,7 +79,7 @@ paths:
           description: No response body
   /auth/health/:
     get:
-      operationId: auth_health_retrieve
+      operationId: health_retrieve
       description: Check the health status of the service including database and cache
         connections.
       summary: Health check endpoint
@@ -130,7 +130,7 @@ paths:
           description: ''
   /auth/health/live/:
     get:
-      operationId: auth_health_live_retrieve
+      operationId: health_live_retrieve
       description: Check if the service is alive (basic endpoint for load balancers).
       summary: Liveness check endpoint
       tags:
@@ -151,7 +151,7 @@ paths:
           description: ''
   /auth/health/ready/:
     get:
-      operationId: auth_health_ready_retrieve
+      operationId: health_ready_retrieve
       description: Check if the service is ready to accept requests.
       summary: Readiness check endpoint
       tags:
@@ -182,7 +182,7 @@ paths:
           description: ''
   /auth/login/:
     post:
-      operationId: auth_login_create
+      operationId: login_create
       description: Authenticate user with email and password. Returns JWT tokens and
         session token.
       summary: User login
@@ -218,7 +218,7 @@ paths:
           description: ''
   /auth/logout/:
     post:
-      operationId: auth_logout_create
+      operationId: logout_create
       description: Logout user by blacklisting refresh token and/or terminating session.
       summary: User logout
       tags:
@@ -245,7 +245,7 @@ paths:
           description: ''
   /auth/profile/:
     get:
-      operationId: auth_profile_retrieve
+      operationId: profile_retrieve
       description: Get current user's profile information.
       summary: Get user profile
       tags:
@@ -260,7 +260,7 @@ paths:
                 $ref: '#/components/schemas/UserProfile'
           description: ''
     put:
-      operationId: auth_profile_update
+      operationId: profile_update
       description: Update current user's profile information.
       summary: Update user profile
       tags:
@@ -293,7 +293,7 @@ paths:
           description: ''
   /auth/refresh-token/:
     post:
-      operationId: auth_refresh_token_create
+      operationId: refresh_token_create
       description: Refresh access token using refresh token.
       summary: Refresh JWT token
       tags:
@@ -327,7 +327,7 @@ paths:
           description: ''
   /auth/register/:
     post:
-      operationId: auth_register_create
+      operationId: register_create
       description: Create a new user account with email, password, and basic information.
       summary: Register a new user
       tags:
@@ -362,7 +362,7 @@ paths:
           description: ''
   /auth/sessions/:
     get:
-      operationId: auth_sessions_list
+      operationId: sessions_list
       description: Retrieve all active sessions for the current user.
       summary: Get active user sessions
       tags:
@@ -379,7 +379,7 @@ paths:
                   $ref: '#/components/schemas/UserSession'
           description: ''
     delete:
-      operationId: auth_sessions_destroy
+      operationId: sessions_destroy
       description: Terminate a specific session by ID or all user sessions if no session_id
         provided.
       summary: Terminate user sessions
@@ -402,7 +402,7 @@ paths:
           description: ''
   /auth/supervised-users/:
     get:
-      operationId: auth_supervised_users_retrieve
+      operationId: supervised_users_retrieve
       description: Get list of users supervised by the current user or all supervised
         users if admin.
       summary: List supervised users
@@ -414,7 +414,7 @@ paths:
         '200':
           description: No response body
     post:
-      operationId: auth_supervised_users_create
+      operationId: supervised_users_create
       description: Create a new supervisor-supervised user relationship.
       summary: Create supervision relationship
       tags:
@@ -438,7 +438,7 @@ paths:
           description: No response body
   /auth/supervised-users/{id}/:
     get:
-      operationId: auth_supervised_users_retrieve_2
+      operationId: supervised_users_retrieve_2
       description: Get details of a specific supervision relationship.
       summary: Get supervision relationship
       parameters:
@@ -456,7 +456,7 @@ paths:
         '200':
           description: No response body
     put:
-      operationId: auth_supervised_users_update
+      operationId: supervised_users_update
       description: Update monitoring settings for a supervision relationship.
       summary: Update supervision relationship
       parameters:
@@ -474,7 +474,7 @@ paths:
         '200':
           description: No response body
     delete:
-      operationId: auth_supervised_users_destroy
+      operationId: supervised_users_destroy
       description: Remove a supervision relationship.
       summary: Delete supervision relationship
       parameters:
@@ -493,7 +493,7 @@ paths:
           description: No response body
   /auth/verify-token/:
     post:
-      operationId: auth_verify_token_create
+      operationId: verify_token_create
       description: Verify JWT token validity and return user information. Used by
         other services for authentication.
       summary: Verify JWT token
@@ -541,7 +541,7 @@ paths:
           description: ''
   /health/:
     get:
-      operationId: health_retrieve
+      operationId: health_retrieve_2
       description: Check the health status of the service including database and cache
         connections.
       summary: Health check endpoint
@@ -958,9 +958,9 @@ components:
           minLength: 1
           maxLength: 50
 servers:
-- url: http://localhost:8000/api
+- url: http://localhost:8000
   description: Local development server
-- url: https://syncscope-auth-service-dev.up.railway.app/api
+- url: https://syncscope-auth-service-dev.up.railway.app
   description: Development server
 tags:
 - name: Authentication

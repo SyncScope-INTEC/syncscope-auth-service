@@ -318,12 +318,12 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
-    "SCHEMA_PATH_PREFIX": "/api/",
+    "SCHEMA_PATH_PREFIX": "/auth/",
     # Security scheme configuration
     "SECURITY": [{"Bearer": []}],
     "SERVERS": [
-        {"url": "http://localhost:8000/api", "description": "Local development server"},
-        {"url": "https://syncscope-auth-service-dev.up.railway.app/api", "description": "Development server"},
+        {"url": "http://localhost:8000", "description": "Local development server"},
+        {"url": "https://syncscope-auth-service-dev.up.railway.app", "description": "Development server"},
     ],
     # Better component handling
     "COMPONENT_SPLIT_PATCH": True,
