@@ -9,6 +9,11 @@ on:
       - master
     types: [opened, synchronize, ready_for_review]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   enforce-branch-protection:
     runs-on: ubuntu-latest
