@@ -20,9 +20,20 @@ from config.database_retry import atomic_with_retry
 from .db_mixins import ServerlessViewMixin
 from .models import SupervisedUser, User, UserSession
 from .serializers import (
+    AuthResponseSerializer,
+    ErrorResponseSerializer,
+    LogoutResponseSerializer,
+    LogoutSerializer,
+    PasswordChangeResponseSerializer,
     PasswordChangeSerializer,
+    SessionTerminationResponseSerializer,
+    SessionTerminationSerializer,
     SupervisedUserCreateSerializer,
     SupervisedUserSerializer,
+    TokenRefreshRequestSerializer,
+    TokenRefreshResponseSerializer,
+    TokenVerificationResponseSerializer,
+    TokenVerificationSerializer,
     UserLoginSerializer,
     UserProfileSerializer,
     UserRegistrationSerializer,
@@ -39,23 +50,8 @@ from .utils import create_user_session, get_client_ip, get_tokens_for_user, inva
         description="Create a new user account with email, password, and basic information.",
         request=UserRegistrationSerializer,
         responses={
-            201: OpenApiExample(
-                "Success",
-                value={
-                    "message": "User registered successfully",
-                    "user": {
-                        "id": "uuid",
-                        "email": "user@example.com",
-                        "first_name": "John",
-                        "last_name": "Doe",
-                        "role": "developer",
-                        "company": None,
-                    },
-                    "tokens": {"access": "jwt_access_token", "refresh": "jwt_refresh_token"},
-                    "session_token": "session_token",
-                },
-            ),
-            400: "Bad Request - Validation errors",
+            201: AuthResponseSerializer,
+            400: ErrorResponseSerializer,
         },
     )
 )
@@ -84,6 +80,18 @@ class RegisterView(ServerlessViewMixin, APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Authentication"],
+        summary="User login",
+        description="Authenticate user with email and password. Returns JWT tokens and session token.",
+        request=UserLoginSerializer,
+        responses={
+            200: AuthResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+)
 @method_decorator(ratelimit(key="ip", rate="10/m", method="POST"), name="post")
 class LoginView(ServerlessViewMixin, APIView):
     permission_classes = [permissions.AllowAny]
@@ -113,6 +121,15 @@ class LoginView(ServerlessViewMixin, APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Authentication"],
+        summary="User logout",
+        description="Logout user by blacklisting refresh token and/or terminating session.",
+        request=LogoutSerializer,
+        responses={200: LogoutResponseSerializer},
+    )
+)
 class LogoutView(ServerlessViewMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -140,6 +157,21 @@ class LogoutView(ServerlessViewMixin, APIView):
         return Response({"message": "Logout completed"}, status=status.HTTP_200_OK)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=["User Profile"],
+        summary="Get user profile",
+        description="Get current user's profile information.",
+        responses={200: UserProfileSerializer},
+    ),
+    put=extend_schema(
+        tags=["User Profile"],
+        summary="Update user profile",
+        description="Update current user's profile information.",
+        request=UserUpdateSerializer,
+        responses={200: UserProfileSerializer, 400: ErrorResponseSerializer},
+    ),
+)
 class ProfileView(ServerlessViewMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -155,6 +187,18 @@ class ProfileView(ServerlessViewMixin, APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema_view(
+    post=extend_schema(
+        tags=["User Profile"],
+        summary="Change password",
+        description="Change current user's password. Requires old password for verification.",
+        request=PasswordChangeSerializer,
+        responses={
+            200: PasswordChangeResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+)
 class ChangePasswordView(ServerlessViewMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -170,6 +214,16 @@ class ChangePasswordView(ServerlessViewMixin, APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=["Authentication"],
+    summary="Refresh JWT token",
+    description="Refresh access token using refresh token.",
+    request=TokenRefreshRequestSerializer,
+    responses={
+        200: TokenRefreshResponseSerializer,
+        401: ErrorResponseSerializer,
+    },
+)
 @method_decorator(ratelimit(key="ip", rate="30/m", method="POST"), name="post")
 class CustomTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
@@ -179,6 +233,18 @@ class CustomTokenRefreshView(TokenRefreshView):
         return response
 
 
+@extend_schema(
+    tags=["Authentication"],
+    summary="Verify JWT token",
+    description="Verify JWT token validity and return user information. Used by other services for authentication.",
+    request=TokenVerificationSerializer,
+    responses={
+        200: TokenVerificationResponseSerializer,
+        400: TokenVerificationResponseSerializer,
+        401: TokenVerificationResponseSerializer,
+        404: TokenVerificationResponseSerializer,
+    },
+)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 @ratelimit(key="ip", rate="60/m", method="POST")
@@ -213,6 +279,24 @@ def verify_token(request):
         return Response({"valid": False, "error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Session Management"],
+        summary="Get active user sessions",
+        description="Retrieve all active sessions for the current user.",
+        responses={200: UserSessionSerializer(many=True)},
+    ),
+    delete=extend_schema(
+        tags=["Session Management"],
+        summary="Terminate user sessions",
+        description="Terminate a specific session by ID or all user sessions if no session_id provided.",
+        request=SessionTerminationSerializer,
+        responses={
+            200: SessionTerminationResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+)
 class UserSessionsView(ServerlessViewMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
 

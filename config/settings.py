@@ -319,25 +319,88 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": "/api/",
+    # Security scheme configuration
+    "SECURITY": [{"Bearer": []}],
+    "SERVERS": [
+        {"url": "http://localhost:8000/api", "description": "Local development server"},
+        {"url": "https://syncscope-auth-service-dev.up.railway.app/api", "description": "Development server"},
+    ],
+    # Better component handling
+    "COMPONENT_SPLIT_PATCH": True,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "ENUM_NAME_OVERRIDES": {
+        "ValidationErrorEnum": "django.core.exceptions.ValidationError",
+    },
+    # Schema processing
+    "PREPROCESSING_HOOKS": [],
+    "POSTPROCESSING_HOOKS": [],
+    # Contact information
+    "CONTACT": {
+        "name": "SyncScope Development Team",
+        "email": "dev@syncscope.com",
+    },
+    "LICENSE": {
+        "name": "MIT License",
+    },
+    # Tags configuration
+    "TAGS": [
+        {
+            "name": "Authentication",
+            "description": "User authentication endpoints including login, register, logout, and token management",
+        },
+        {
+            "name": "User Profile",
+            "description": "User profile management endpoints",
+        },
+        {
+            "name": "Session Management",
+            "description": "User session tracking and management",
+        },
+        {
+            "name": "Supervision",
+            "description": "Supervisor-supervisee relationship management",
+        },
+        {
+            "name": "Health",
+            "description": "Service health check endpoints",
+        },
+    ],
+    # Swagger UI settings
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
         "persistAuthorization": True,
         "displayOperationId": True,
-        "defaultModelsExpandDepth": 1,
-        "defaultModelExpandDepth": 1,
+        "defaultModelsExpandDepth": 2,
+        "defaultModelExpandDepth": 2,
         "defaultModelRendering": "example",
         "displayRequestDuration": True,
-        "docExpansion": "none",
+        "docExpansion": "list",
         "filter": True,
         "operationsSorter": "alpha",
         "showExtensions": True,
         "tagsSorter": "alpha",
         "tryItOutEnabled": True,
+        "supportedSubmitMethods": ["get", "post", "put", "delete", "patch"],
     },
+    # ReDoc settings
+    "REDOC_UI_SETTINGS": {
+        "hideDownloadButton": False,
+        "hideHostname": False,
+        "hideLoading": False,
+        "hideSchemaPattern": True,
+        "expandResponses": "200,201",
+        "requiredPropsFirst": True,
+        "simpleOneOfTypeLabel": False,
+        "sortPropsAlphabetically": True,
+        "payloadSampleIdx": 0,
+    },
+    # Authentication whitelist
     "AUTHENTICATION_WHITELIST": [
         "apps.authentication.views.LoginView",
         "apps.authentication.views.RegisterView",
+        "apps.authentication.views.verify_token",
         "apps.authentication.oauth.github_oauth_url",
         "apps.authentication.oauth.github_oauth_callback",
+        "apps.authentication.views.api_home",
     ],
 }

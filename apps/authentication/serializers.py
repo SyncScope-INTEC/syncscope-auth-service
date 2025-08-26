@@ -19,14 +19,30 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, validators=[validate_password])
-    password_confirm = serializers.CharField(write_only=True)
-    company_name = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        help_text="Password must be at least 8 characters long",
+        style={"input_type": "password"},
+    )
+    password_confirm = serializers.CharField(
+        write_only=True, help_text="Re-enter password for confirmation", style={"input_type": "password"}
+    )
+    company_name = serializers.CharField(
+        write_only=True,
+        required=False,
+        help_text="Optional company name. If provided, a new company will be created or linked.",
+    )
 
     class Meta:
         model = User
         fields = ["email", "first_name", "last_name", "password", "password_confirm", "company_name", "role"]
-        extra_kwargs = {"role": {"default": "developer"}}
+        extra_kwargs = {
+            "role": {"default": "developer", "help_text": "User role: developer, supervisor, or admin"},
+            "email": {"help_text": "User's email address (must be unique)"},
+            "first_name": {"help_text": "User's first name"},
+            "last_name": {"help_text": "User's last name"},
+        }
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
@@ -53,8 +69,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=False)
-    password = serializers.CharField(write_only=True, required=False)
+    email = serializers.EmailField(required=True, help_text="User's email address")
+    password = serializers.CharField(
+        write_only=True, required=True, help_text="User's password", style={"input_type": "password"}
+    )
 
     def validate(self, attrs):
         email = attrs.get("email", "")
@@ -135,9 +153,21 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
 
 class PasswordChangeSerializer(serializers.Serializer):
-    old_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True, validators=[validate_password])
-    new_password_confirm = serializers.CharField(write_only=True, required=False)
+    old_password = serializers.CharField(
+        write_only=True, help_text="Current password for verification", style={"input_type": "password"}
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        help_text="New password (must be at least 8 characters long)",
+        style={"input_type": "password"},
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True,
+        required=False,
+        help_text="Confirm new password (optional but recommended)",
+        style={"input_type": "password"},
+    )
 
     def validate_old_password(self, value):
         user = self.context["request"].user
@@ -179,9 +209,87 @@ class SupervisedUserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at", "agent_last_heartbeat"]
 
 
+class TokenVerificationSerializer(serializers.Serializer):
+    """Serializer for token verification requests"""
+
+    token = serializers.CharField(help_text="JWT access token to verify", required=True)
+
+
+class LogoutSerializer(serializers.Serializer):
+    """Serializer for logout requests"""
+
+    refresh_token = serializers.CharField(required=False, help_text="JWT refresh token to blacklist")
+    session_token = serializers.CharField(required=False, help_text="Session token to terminate")
+
+
+class TokenRefreshRequestSerializer(serializers.Serializer):
+    """Serializer for token refresh requests"""
+
+    refresh = serializers.CharField(help_text="JWT refresh token", required=True)
+
+
+class SessionTerminationSerializer(serializers.Serializer):
+    """Serializer for session termination requests"""
+
+    session_id = serializers.UUIDField(
+        required=False, help_text="Specific session ID to terminate. If not provided, all sessions will be terminated."
+    )
+
+
+class AuthResponseSerializer(serializers.Serializer):
+    """Response serializer for authentication endpoints"""
+
+    message = serializers.CharField()
+    user = UserProfileSerializer()
+    tokens = serializers.DictField(child=serializers.CharField())
+    session_token = serializers.CharField()
+
+
+class LogoutResponseSerializer(serializers.Serializer):
+    """Response serializer for logout endpoint"""
+
+    message = serializers.CharField()
+
+
+class TokenRefreshResponseSerializer(serializers.Serializer):
+    """Response serializer for token refresh endpoint"""
+
+    access = serializers.CharField()
+    message = serializers.CharField()
+
+
+class TokenVerificationResponseSerializer(serializers.Serializer):
+    """Response serializer for token verification endpoint"""
+
+    valid = serializers.BooleanField()
+    user_id = serializers.CharField(required=False)
+    email = serializers.CharField(required=False)
+    role = serializers.CharField(required=False)
+    company_id = serializers.CharField(required=False, allow_null=True)
+    error = serializers.CharField(required=False)
+
+
+class PasswordChangeResponseSerializer(serializers.Serializer):
+    """Response serializer for password change endpoint"""
+
+    message = serializers.CharField()
+
+
+class SessionTerminationResponseSerializer(serializers.Serializer):
+    """Response serializer for session termination endpoint"""
+
+    message = serializers.CharField()
+
+
+class ErrorResponseSerializer(serializers.Serializer):
+    """Generic error response serializer"""
+
+    error = serializers.CharField()
+
+
 class SupervisedUserCreateSerializer(serializers.ModelSerializer):
-    user_id = serializers.UUIDField(write_only=True)
-    supervisor_id = serializers.UUIDField(write_only=True)
+    user_id = serializers.UUIDField(write_only=True, help_text="UUID of the user to be supervised")
+    supervisor_id = serializers.UUIDField(write_only=True, help_text="UUID of the supervisor user")
 
     class Meta:
         model = SupervisedUser
