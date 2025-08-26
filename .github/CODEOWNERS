@@ -1,0 +1,38 @@
+# CODEOWNERS file for SyncScope Auth Service
+# This file defines code ownership for automatic review assignments
+
+# Global default owners (fallback for any files not specified below)
+* @AlejandroBeltre
+
+# Production branch protection - requires manual approval
+# All changes to production-related files require owner approval
+/prod/* @AlejandroBeltre
+/production/* @AlejandroBeltre
+
+# Critical configuration files
+/.env* @AlejandroBeltre
+/config/settings.py @AlejandroBeltre
+/Dockerfile @AlejandroBeltre
+/docker-compose*.yml @AlejandroBeltre
+/requirements.txt @AlejandroBeltre
+/pyproject.toml @AlejandroBeltre
+
+# Database migrations (require careful review)
+/apps/*/migrations/ @AlejandroBeltre
+
+# GitHub workflows and settings
+/.github/ @AlejandroBeltre
+
+# Security-related files
+/apps/authentication/middleware.py @AlejandroBeltre
+/apps/authentication/authentication.py @AlejandroBeltre
+/apps/authentication/tokens.py @AlejandroBeltre
+/apps/authentication/utils.py @AlejandroBeltre
+
+# Infrastructure and deployment
+/start.sh @AlejandroBeltre
+/gunicorn.conf.py @AlejandroBeltre
+/healthcheck.py @AlejandroBeltre
+
+# Documentation that affects deployment
+/README.md @AlejandroBeltre
