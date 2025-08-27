@@ -178,7 +178,9 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Ensure Django can find static files during collectstatic
-STATICFILES_DIRS = []
+STATICFILES_DIRS = [
+    BASE_DIR / "apps" / "authentication" / "static",
+]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
