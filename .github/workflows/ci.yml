@@ -47,6 +47,28 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          # Fetch more history for proper diff comparison
+          fetch-depth: 0
+
+      - name: Set up Git for diff coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          # Set up git configuration
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Ensure we have the base branch for comparison
+          echo "Setting up base branch for comparison..."
+          BASE_BRANCH="${{ github.base_ref }}"
+          echo "Base branch: $BASE_BRANCH"
+
+          # Fetch the base branch
+          git fetch origin "$BASE_BRANCH:$BASE_BRANCH" || echo "Branch $BASE_BRANCH already exists"
+
+          # List available branches for debugging
+          echo "Available branches:"
+          git branch -a
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -102,6 +124,22 @@ jobs:
             manage.py
             __pycache__/**
 
+      - name: Debug git setup (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "=== Git Debug Information ==="
+          echo "Current HEAD: $(git rev-parse HEAD)"
+          echo "Current branch: $(git branch --show-current)"
+          echo "Base ref: ${{ github.base_ref }}"
+          echo "Head ref: ${{ github.head_ref }}"
+          echo ""
+          echo "Available branches:"
+          git branch -a
+          echo ""
+          echo "Recent commits:"
+          git log --oneline -5
+          echo "=========================="
+
       - name: Run tests with differential coverage (PR)
         if: github.event_name == 'pull_request'
         env:
@@ -119,18 +157,31 @@ jobs:
         run: |
           # Install diff-cover for differential coverage
           pip install diff-cover
-          
+
           # Run all tests but generate coverage
           coverage run -m pytest tests/ --ds=config.settings
           coverage xml
-          
+
           # Generate differential coverage report only for changed files
           if [ "${{ steps.changed-files.outputs.any_changed }}" == "true" ]; then
             echo "Changed Python files:"
             echo "${{ steps.changed-files.outputs.all_changed_files }}"
             
-            # Generate diff coverage report
-            diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 --show-uncovered
+            # Get the base branch for comparison
+            BASE_BRANCH="${{ github.base_ref }}"
+            echo "Comparing against base branch: $BASE_BRANCH"
+            
+            # Try different comparison strategies
+            if git rev-parse "$BASE_BRANCH" >/dev/null 2>&1; then
+              echo "Using local branch: $BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="$BASE_BRANCH" --fail-under=80 --show-uncovered
+            elif git rev-parse "origin/$BASE_BRANCH" >/dev/null 2>&1; then
+              echo "Using origin branch: origin/$BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="origin/$BASE_BRANCH" --fail-under=80 --show-uncovered
+            else
+              echo "⚠️ Could not find base branch for comparison. Using HEAD~1 as fallback."
+              diff-cover coverage.xml --compare-branch="HEAD~1" --fail-under=80 --show-uncovered
+            fi
           else
             echo "No Python files changed, skipping differential coverage"
           fi
@@ -215,7 +266,7 @@ jobs:
 
             const coverageType = '${{ steps.coverage_check.outputs.type }}';
             const isChanged = '${{ steps.changed-files.outputs.any_changed }}' === 'true';
-            
+
             let comment;
             if (coverageType === 'differential') {
               if (isChanged) {
