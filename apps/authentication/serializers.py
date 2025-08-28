@@ -3,6 +3,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from config.database_retry import database_retry
+
 from .models import Company, SupervisedUser, User, UserSession
 
 
@@ -44,6 +46,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "last_name": {"help_text": "User's last name"},
         }
 
+    @database_retry(max_retries=2)
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
             raise serializers.ValidationError("Passwords don't match")
@@ -74,6 +77,7 @@ class UserLoginSerializer(serializers.Serializer):
         write_only=True, required=True, help_text="User's password", style={"input_type": "password"}
     )
 
+    @database_retry(max_retries=2)
     def validate(self, attrs):
         email = attrs.get("email", "")
         password = attrs.get("password")
@@ -295,6 +299,7 @@ class SupervisedUserCreateSerializer(serializers.ModelSerializer):
         model = SupervisedUser
         fields = ["user_id", "supervisor_id", "monitoring_enabled"]
 
+    @database_retry(max_retries=2)
     def validate(self, attrs):
         user_id = attrs.get("user_id")
         supervisor_id = attrs.get("supervisor_id")
