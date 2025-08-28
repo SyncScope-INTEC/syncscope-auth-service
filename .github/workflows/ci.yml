@@ -164,26 +164,93 @@ jobs:
 
           # Generate differential coverage report only for changed files
           if [ "${{ steps.changed-files.outputs.any_changed }}" == "true" ]; then
-            echo "Changed Python files:"
-            echo "${{ steps.changed-files.outputs.all_changed_files }}"
+            echo "🔍 Changed Python files:"
+            echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | sed 's/^/  📄 /'
+            echo ""
             
             # Get the base branch for comparison
             BASE_BRANCH="${{ github.base_ref }}"
-            echo "Comparing against base branch: $BASE_BRANCH"
+            echo "📊 Comparing against base branch: $BASE_BRANCH"
+            echo ""
+            
+            # Create a temporary file to capture diff-cover output
+            DIFF_COVER_OUTPUT="/tmp/diff_cover_output.txt"
+            DIFF_COVER_STATUS=0
             
             # Try different comparison strategies
             if git rev-parse "$BASE_BRANCH" >/dev/null 2>&1; then
-              echo "Using local branch: $BASE_BRANCH"
-              diff-cover coverage.xml --compare-branch="$BASE_BRANCH" --fail-under=80 --show-uncovered
+              echo "✅ Using local branch: $BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="$BASE_BRANCH" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
             elif git rev-parse "origin/$BASE_BRANCH" >/dev/null 2>&1; then
-              echo "Using origin branch: origin/$BASE_BRANCH"
-              diff-cover coverage.xml --compare-branch="origin/$BASE_BRANCH" --fail-under=80 --show-uncovered
+              echo "✅ Using origin branch: origin/$BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="origin/$BASE_BRANCH" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
             else
               echo "⚠️ Could not find base branch for comparison. Using HEAD~1 as fallback."
-              diff-cover coverage.xml --compare-branch="HEAD~1" --fail-under=80 --show-uncovered
+              diff-cover coverage.xml --compare-branch="HEAD~1" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
             fi
+            
+            # Display the diff-cover output with better formatting
+            echo ""
+            echo "📈 Differential Coverage Results:"
+            echo "=================================="
+            cat "$DIFF_COVER_OUTPUT"
+            echo "=================================="
+            echo ""
+            
+            # Parse coverage results for individual files
+            echo "📋 File-by-file Coverage Summary:"
+            echo "--------------------------------"
+            
+            # Extract coverage information from the diff-cover output
+            if grep -q "Diff Coverage:" "$DIFF_COVER_OUTPUT"; then
+              DIFF_COVERAGE=$(grep "Diff Coverage:" "$DIFF_COVER_OUTPUT" | awk '{print $3}' | tr -d '%')
+              echo "🎯 Overall Differential Coverage: ${DIFF_COVERAGE}%"
+            fi
+            
+            # Extract file-specific coverage information
+            if grep -A 100 "Diff Coverage Report" "$DIFF_COVER_OUTPUT" | grep -E "\.py.*[0-9]+%" > /tmp/file_coverage.txt; then
+              while IFS= read -r line; do
+                if [[ $line =~ ([^[:space:]]+\.py)[[:space:]]+([0-9]+)% ]]; then
+                  file="${BASH_REMATCH[1]}"
+                  coverage="${BASH_REMATCH[2]}"
+                  if [ "$coverage" -ge 80 ]; then
+                    echo "  ✅ $file: ${coverage}% coverage"
+                  elif [ "$coverage" -ge 60 ]; then
+                    echo "  ⚠️  $file: ${coverage}% coverage (below threshold)"
+                  else
+                    echo "  ❌ $file: ${coverage}% coverage (needs improvement)"
+                  fi
+                fi
+              done < /tmp/file_coverage.txt
+            else
+              echo "  ℹ️  Individual file coverage data not available in standard format"
+            fi
+            
+            echo ""
+            
+            # Set status for later steps
+            if [ $DIFF_COVER_STATUS -eq 0 ]; then
+              echo "✅ Differential coverage check PASSED (≥80% threshold met)"
+              echo "diff_coverage_status=passed" >> $GITHUB_ENV
+            else
+              echo "❌ Differential coverage check FAILED (below 80% threshold)"
+              echo "diff_coverage_status=failed" >> $GITHUB_ENV
+              echo ""
+              echo "💡 Tips to improve coverage:"
+              echo "  • Add unit tests for new functions and methods"
+              echo "  • Test edge cases and error conditions"
+              echo "  • Ensure all code paths are tested"
+              echo "  • Consider adding integration tests"
+            fi
+            
+            # Store the diff-cover output for use in PR comments
+            echo "DIFF_COVER_OUTPUT<<EOF" >> $GITHUB_ENV
+            cat "$DIFF_COVER_OUTPUT" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+            
           else
-            echo "No Python files changed, skipping differential coverage"
+            echo "ℹ️  No Python files changed, skipping differential coverage"
+            echo "diff_coverage_status=skipped" >> $GITHUB_ENV
           fi
 
       - name: Run tests with full coverage (Push to main)
@@ -216,9 +283,21 @@ jobs:
               COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
               echo "Overall coverage: ${COVERAGE}%"
               echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
-              echo "status=passed" >> $GITHUB_OUTPUT
               echo "type=differential" >> $GITHUB_OUTPUT
-              echo "✅ Differential coverage check completed for changed files (80% threshold)"
+              
+              # Check differential coverage status
+              DIFF_STATUS="$diff_coverage_status"
+              if [ "$DIFF_STATUS" = "passed" ]; then
+                echo "status=passed" >> $GITHUB_OUTPUT
+                echo "✅ Differential coverage check completed - all modified files meet 80% threshold"
+              elif [ "$DIFF_STATUS" = "failed" ]; then
+                echo "status=failed" >> $GITHUB_OUTPUT
+                echo "❌ Differential coverage check failed - some modified files below 80% threshold"
+                exit 1
+              else
+                echo "status=passed" >> $GITHUB_OUTPUT
+                echo "✅ No Python files changed, differential coverage not required"
+              fi
             else
               echo "coverage=N/A" >> $GITHUB_OUTPUT
               echo "status=passed" >> $GITHUB_OUTPUT
@@ -264,60 +343,89 @@ jobs:
               coverageReport = 'Unable to generate coverage report';
             }
 
-            const coverageType = '${{ steps.coverage_check.outputs.type }}';
+            // Get changed files
+            const changedFiles = '${{ steps.changed-files.outputs.all_changed_files }}';
             const isChanged = '${{ steps.changed-files.outputs.any_changed }}' === 'true';
 
-            let comment;
-            if (coverageType === 'differential') {
-              if (isChanged) {
-                comment = `## ${emoji} Differential Coverage Report - ${statusText}
+            // Get differential coverage output
+            const diffCoverOutput = process.env.DIFF_COVER_OUTPUT || 'Differential coverage report not available';
 
-                **🎯 Coverage Check**: Only modified files are checked for 80% coverage requirement
-                **📊 Overall Project Coverage**: ${coverage}%
+            let comment = '';
 
-                ${status === 'passed' ? '✅ All modified files meet the 80% coverage requirement' : '❌ Some modified files are below the 80% coverage requirement'}
+            if (isChanged) {
+              // Parse changed files for better display
+              const files = changedFiles.split(' ').filter(file => file.length > 0);
+              const fileList = files.map(file => '  📄 `' + file + '`').join('\\n');
 
-                <details>
-                <summary>📊 Changed Files Coverage Report</summary>
-
-                This PR was checked using **differential coverage** - only the modified files need to meet the 80% threshold.
-
-                \`\`\`
-                ${coverageReport}
-                \`\`\`
-
-                </details>
-
-                ${status === 'failed' ? '⚠️ **Action Required:** Please add tests for the modified files to achieve 80% coverage' : '🎉 Great job! All modified files have adequate test coverage'}
-                `;
-              } else {
-                comment = `## ✅ Coverage Report - PASSED
-
-                **🎯 Coverage Check**: No Python files were modified in this PR
-                **📊 Overall Project Coverage**: ${coverage}%
-
-                ✅ No coverage check required as no Python source files were changed.
-
-                🎉 This PR only contains non-Python changes (documentation, configuration, etc.)
-                `;
+              // Extract coverage metrics from diff-cover output
+              let diffCoveragePercent = 'N/A';
+              let coverageByFile = '';
+              
+              const diffCoverageMatch = diffCoverOutput.match(/Diff Coverage: (\\d+)%/);
+              if (diffCoverageMatch) {
+                diffCoveragePercent = diffCoverageMatch[1] + '%';
               }
+
+              // Parse file-specific coverage if available
+              const fileMatches = diffCoverOutput.match(/^(.+\\.py)\\s+\\d+\\s+\\d+\\s+(\\d+)%/gm);
+              if (fileMatches) {
+                coverageByFile = '\\n### 📊 Coverage by Modified File\\n\\n';
+                fileMatches.forEach(match => {
+                  const parts = match.trim().split(/\\s+/);
+                  const fileName = parts[0];
+                  const percentage = parts[parts.length - 1];
+                  const percent = parseInt(percentage.replace('%', ''));
+                  
+                  let statusIcon = '✅';
+                  if (percent < 80) {
+                    statusIcon = percent >= 60 ? '⚠️' : '❌';
+                  }
+                  
+                  coverageByFile += statusIcon + ' `' + fileName + '`: **' + percentage + '**\\n';
+                });
+                coverageByFile += '\\n';
+              }
+
+              const statusMessage = status === 'passed' 
+                ? '✅ **All modified files meet the 80% coverage requirement!** 🎉' 
+                : '❌ **Some modified files are below the 80% coverage requirement**';
+
+              let actionSection = '';
+              if (status === 'failed') {
+                actionSection = '### ⚠️ Action Required\\n\\n' +
+                  '**To improve coverage:**\\n' +
+                  '- 🧪 Add unit tests for new functions and methods\\n' +
+                  '- 🔍 Test edge cases and error conditions\\n' +
+                  '- 🛤️ Ensure all code paths are tested\\n' +
+                  '- 🔗 Consider adding integration tests\\n' +
+                  '- 📖 Review the [testing guidelines](https://docs.python.org/3/library/unittest.html)\\n\\n' +
+                  '**Coverage threshold**: Files with changes must have ≥80% line coverage';
+              } else {
+                actionSection = '### 🎉 Excellent Work!\\n\\n' +
+                  'Your changes maintain high code quality with comprehensive test coverage. The modified files meet our coverage standards.';
+              }
+
+              comment = '## ' + emoji + ' Differential Coverage Report - ' + statusText + '\\n\\n' +
+                '**🎯 Coverage Strategy**: Only modified files are checked for 80% coverage requirement\\n' +
+                '**📊 Overall Project Coverage**: **' + coverage + '%**\\n' +
+                '**🔍 Differential Coverage**: **' + diffCoveragePercent + '** *(coverage of modified lines)*\\n\\n' +
+                '### 📝 Modified Files\\n' + fileList + '\\n\\n' +
+                coverageByFile +
+                '### 📈 Detailed Analysis\\n\\n' + statusMessage + '\\n\\n' +
+                '<details>\\n<summary>📊 Complete Differential Coverage Report</summary>\\n\\n' +
+                '```\\n' + diffCoverOutput + '\\n```\\n\\n</details>\\n\\n' +
+                '<details>\\n<summary>📋 Full Project Coverage Report</summary>\\n\\n' +
+                '```\\n' + coverageReport + '\\n```\\n\\n</details>\\n\\n' +
+                '---\\n\\n' + actionSection;
+                
             } else {
-              comment = `## ${emoji} Full Coverage Report - ${statusText}
-
-                **📊 Full Project Coverage**: ${coverage}%
-                ${status === 'passed' ? '✅ Meets the 80% threshold requirement' : '❌ Below the 80% threshold requirement'}
-
-                <details>
-                <summary>📊 Detailed Coverage Report</summary>
-
-                \`\`\`
-                ${coverageReport}
-                \`\`\`
-
-                </details>
-
-                ${status === 'failed' ? '⚠️ **Action Required:** Please add more tests to improve coverage above 80%' : '🎉 Great job maintaining good test coverage!'}
-                `;
+              comment = '## ✅ Coverage Report - PASSED\\n\\n' +
+                '**🎯 Coverage Check**: No Python files were modified in this PR\\n' +
+                '**📊 Overall Project Coverage**: **' + coverage + '%**\\n\\n' +
+                '✅ **No coverage check required** - This PR only contains non-Python changes\\n\\n' +
+                '🎉 Changes include: documentation, configuration, assets, or other non-code files\\n\\n' +
+                '<details>\\n<summary>📋 Full Project Coverage Report</summary>\\n\\n' +
+                '```\\n' + coverageReport + '\\n```\\n\\n</details>';
             }
 
             try {
