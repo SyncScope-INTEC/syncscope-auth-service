@@ -76,7 +76,7 @@ def health_check(request):
             return True
         else:
             raise Exception("Unable to read/write cache")
-    
+
     try:
         if check_cache():
             health_status["services"]["cache"] = "healthy"
