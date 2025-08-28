@@ -336,14 +336,6 @@ SPECTACULAR_SETTINGS = {
     # Schema processing
     "PREPROCESSING_HOOKS": [],
     "POSTPROCESSING_HOOKS": [],
-    # Contact information
-    "CONTACT": {
-        "name": "SyncScope Development Team",
-        "email": "dev@syncscope.com",
-    },
-    "LICENSE": {
-        "name": "MIT License",
-    },
     # Tags configuration
     "TAGS": [
         {

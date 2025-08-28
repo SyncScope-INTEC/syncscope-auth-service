@@ -10,6 +10,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from config.database_retry import DatabaseHealthCheck, database_retry
+
 
 @extend_schema(
     tags=["Health"],
@@ -55,23 +57,29 @@ def health_check(request):
 
     errors = []
 
-    # Check database connection
+    # Check database connection with retry logic
     try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-        health_status["services"]["database"] = "healthy"
+        if DatabaseHealthCheck.is_healthy(use_cache=False):
+            health_status["services"]["database"] = "healthy"
+        else:
+            health_status["services"]["database"] = "unhealthy"
+            errors.append("Database: Connection failed after retries")
     except Exception as e:
         health_status["services"]["database"] = "unhealthy"
         errors.append(f"Database: {str(e)}")
 
-    # Check cache/Redis connection
-    try:
+    # Check cache/Redis connection with retry logic
+    @database_retry(max_retries=2, log_attempts=False)
+    def check_cache():
         cache.set("health_check", "ok", 10)
         if cache.get("health_check") == "ok":
-            health_status["services"]["cache"] = "healthy"
+            return True
         else:
-            health_status["services"]["cache"] = "unhealthy"
-            errors.append("Cache: Unable to read/write")
+            raise Exception("Unable to read/write cache")
+
+    try:
+        if check_cache():
+            health_status["services"]["cache"] = "healthy"
     except Exception as e:
         health_status["services"]["cache"] = "unhealthy"
         errors.append(f"Cache: {str(e)}")
@@ -101,11 +109,11 @@ def readiness_check(request):
     Readiness check endpoint for Kubernetes/Railway deployments.
     """
     try:
-        # Quick database check
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-
-        return Response({"status": "ready"}, status=status.HTTP_200_OK)
+        # Database check with retry logic
+        if DatabaseHealthCheck.is_healthy(use_cache=True):
+            return Response({"status": "ready"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     except Exception:
         return Response({"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
