@@ -6,6 +6,8 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from config.database_retry import database_retry
+
 from .models import UserSession
 
 
@@ -19,6 +21,7 @@ def hash_token(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+@database_retry()
 def create_user_session(user, request=None):
     """Create a new user session"""
     token = generate_session_token()
@@ -55,6 +58,7 @@ def get_tokens_for_user(user):
     }
 
 
+@database_retry()
 def invalidate_user_sessions(user, exclude_session_id=None):
     """Invalidate all user sessions except optionally one"""
     sessions = user.sessions.all()
@@ -81,6 +85,7 @@ def get_client_ip(request):
     return request.META.get("REMOTE_ADDR", "127.0.0.1")
 
 
+@database_retry()
 def validate_session_token(token):
     """Validate a session token and return the session if valid"""
     if not token:

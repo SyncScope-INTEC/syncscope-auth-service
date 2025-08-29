@@ -52,7 +52,7 @@ class TestHealthCheckErrorScenarios:
 
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert response.data["status"] == "unhealthy"
-        assert "Cache: Unable to read/write" in response.data["errors"]
+        assert "Cache: Unable to read/write cache" in response.data["errors"]
         assert response.data["services"]["cache"] == "unhealthy"
 
     @patch("django.db.connection.cursor")
@@ -72,10 +72,10 @@ class TestHealthCheckErrorScenarios:
         assert response.data["services"]["database"] == "unhealthy"
         assert response.data["services"]["cache"] == "unhealthy"
 
-    @patch("django.db.connection.cursor")
-    def test_readiness_check_database_failure(self, mock_cursor, api_client):
+    @patch("config.database_retry.DatabaseHealthCheck.is_healthy")
+    def test_readiness_check_database_failure(self, mock_is_healthy, api_client):
         """Test readiness check when database is unavailable."""
-        mock_cursor.side_effect = OperationalError("Database connection failed")
+        mock_is_healthy.return_value = False
 
         url = reverse("readiness_check")
         response = api_client.get(url)

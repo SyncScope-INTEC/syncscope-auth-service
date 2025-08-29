@@ -47,6 +47,28 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          # Fetch more history for proper diff comparison
+          fetch-depth: 0
+
+      - name: Set up Git for diff coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          # Set up git configuration
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Ensure we have the base branch for comparison
+          echo "Setting up base branch for comparison..."
+          BASE_BRANCH="${{ github.base_ref }}"
+          echo "Base branch: $BASE_BRANCH"
+
+          # Fetch the base branch
+          git fetch origin "$BASE_BRANCH:$BASE_BRANCH" || echo "Branch $BASE_BRANCH already exists"
+
+          # List available branches for debugging
+          echo "Available branches:"
+          git branch -a
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -89,7 +111,37 @@ jobs:
 
           # Check import sorting
           isort --check-only --diff .
-      - name: Run tests
+      - name: Get changed files (PR only)
+        if: github.event_name == 'pull_request'
+        id: changed-files
+        uses: tj-actions/changed-files@v46
+        with:
+          files: |
+            **/*.py
+          files_ignore: |
+            migrations/**
+            tests/**
+            manage.py
+            __pycache__/**
+
+      - name: Debug git setup (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "=== Git Debug Information ==="
+          echo "Current HEAD: $(git rev-parse HEAD)"
+          echo "Current branch: $(git branch --show-current)"
+          echo "Base ref: ${{ github.base_ref }}"
+          echo "Head ref: ${{ github.head_ref }}"
+          echo ""
+          echo "Available branches:"
+          git branch -a
+          echo ""
+          echo "Recent commits:"
+          git log --oneline -5
+          echo "=========================="
+
+      - name: Run tests with differential coverage (PR)
+        if: github.event_name == 'pull_request'
         env:
           SECRET_KEY: "test-secret-key-for-ci"
           DEBUG: "True"
@@ -103,7 +155,78 @@ jobs:
           ALLOWED_HOSTS: "localhost,127.0.0.1"
           CORS_ALLOWED_ORIGINS: "http://localhost:3000"
         run: |
-          # Run tests with coverage
+          # Install diff-cover for differential coverage
+          pip install diff-cover
+
+          # Run all tests with coverage report generation
+          coverage run -m pytest tests/ --ds=config.settings
+
+          # Generate both XML and text coverage reports
+          coverage xml
+          coverage report > coverage-report.txt
+
+          # Generate differential coverage report only for changed files
+          if [ "${{ steps.changed-files.outputs.any_changed }}" == "true" ]; then
+            echo "🔍 Changed Python files:"
+            echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | sed 's/^/  📄 /'
+            echo ""
+            
+            # Get the base branch for comparison
+            BASE_BRANCH="${{ github.base_ref }}"
+            echo "📊 Comparing against base branch: $BASE_BRANCH"
+            echo ""
+            
+            # Create a temporary file to capture diff-cover output
+            DIFF_COVER_OUTPUT="/tmp/diff_cover_output.txt"
+            DIFF_COVER_STATUS=0
+            
+            # Try different comparison strategies
+            if git rev-parse "$BASE_BRANCH" >/dev/null 2>&1; then
+              echo "✅ Using local branch: $BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="$BASE_BRANCH" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
+            elif git rev-parse "origin/$BASE_BRANCH" >/dev/null 2>&1; then
+              echo "✅ Using origin branch: origin/$BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="origin/$BASE_BRANCH" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
+            else
+              echo "⚠️ Could not find base branch for comparison. Using HEAD~1 as fallback."
+              diff-cover coverage.xml --compare-branch="HEAD~1" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
+            fi
+            
+            # Set status for later steps
+            if [ $DIFF_COVER_STATUS -eq 0 ]; then
+              echo "✅ Differential coverage check PASSED (≥80% threshold met)"
+              echo "diff_coverage_status=passed" >> $GITHUB_ENV
+            else
+              echo "❌ Differential coverage check FAILED (below 80% threshold)"
+              echo "diff_coverage_status=failed" >> $GITHUB_ENV
+            fi
+            
+            # Store the diff-cover output for use in PR comments
+            echo "DIFF_COVER_OUTPUT<<EOF" >> $GITHUB_ENV
+            cat "$DIFF_COVER_OUTPUT" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+            
+          else
+            echo "ℹ️  No Python files changed, skipping differential coverage"
+            echo "diff_coverage_status=skipped" >> $GITHUB_ENV
+          fi
+
+      - name: Run tests with full coverage (Push to main)
+        if: github.event_name == 'push'
+        env:
+          SECRET_KEY: "test-secret-key-for-ci"
+          DEBUG: "True"
+          DB_NAME: "test_syncscope"
+          DB_USER: "postgres"
+          DB_PASSWORD: "postgres"
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          REDIS_URL: "redis://localhost:6379/0"
+          JWT_SECRET_KEY: "test-jwt-secret"
+          ALLOWED_HOSTS: "localhost,127.0.0.1"
+          CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+        run: |
+          # Run tests with full coverage
           coverage run -m pytest tests/ --ds=config.settings
           coverage report
           coverage xml
@@ -111,77 +234,73 @@ jobs:
       - name: Check coverage threshold
         id: coverage_check
         run: |
-          # Extract coverage percentage and fail if below 80%
-          COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
-          echo "Current coverage: ${COVERAGE}%"
-          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
-
-          if ! python -c "import sys; sys.exit(0 if float('${COVERAGE}') >= 80 else 1)"; then
-            echo "❌ Coverage is ${COVERAGE}%, which is below the required 80% threshold"
-            echo "Please add more tests to improve coverage"
-            echo "status=failed" >> $GITHUB_OUTPUT
-            exit 1
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # For PRs, check if coverage files were generated
+            if [ -f "coverage.xml" ] && [ -f "coverage-report.txt" ]; then
+              COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+              echo "Overall coverage: ${COVERAGE}%"
+              echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+              echo "type=differential" >> $GITHUB_OUTPUT
+              
+              # Check differential coverage status
+              DIFF_STATUS="$diff_coverage_status"
+              if [ "$DIFF_STATUS" = "passed" ]; then
+                echo "status=passed" >> $GITHUB_OUTPUT
+                echo "✅ Differential coverage check completed - all modified files meet 80% threshold"
+              elif [ "$DIFF_STATUS" = "failed" ]; then
+                echo "status=failed" >> $GITHUB_OUTPUT
+                echo "❌ Differential coverage check failed - some modified files below 80% threshold"
+                exit 1
+              else
+                echo "status=passed" >> $GITHUB_OUTPUT
+                echo "✅ No Python files changed, differential coverage not required"
+              fi
+            else
+              echo "coverage=N/A" >> $GITHUB_OUTPUT
+              echo "status=passed" >> $GITHUB_OUTPUT
+              echo "type=differential" >> $GITHUB_OUTPUT
+              echo "✅ No Python files changed, differential coverage not required"
+            fi
           else
-            echo "✅ Coverage is ${COVERAGE}%, which meets the 80% threshold"
-            echo "status=passed" >> $GITHUB_OUTPUT
+            # For pushes to main, check full coverage
+            COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+            echo "Full coverage: ${COVERAGE}%"
+            echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+            echo "type=full" >> $GITHUB_OUTPUT
+
+            if ! python -c "import sys; sys.exit(0 if float('${COVERAGE}') >= 80 else 1)"; then
+              echo "❌ Coverage is ${COVERAGE}%, which is below the required 80% threshold"
+              echo "Please add more tests to improve coverage"
+              echo "status=failed" >> $GITHUB_OUTPUT
+              exit 1
+            else
+              echo "✅ Coverage is ${COVERAGE}%, which meets the 80% threshold"
+              echo "status=passed" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Comment coverage report on PR
         if: github.event_name == 'pull_request'
-        continue-on-error: true
-        uses: actions/github-script@v7
+        uses: MishaKav/pytest-coverage-comment@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const coverage = '${{ steps.coverage_check.outputs.coverage }}';
-            const status = '${{ steps.coverage_check.outputs.status }}';
-            const emoji = status === 'passed' ? '✅' : '❌';
-            const statusText = status === 'passed' ? 'PASSED' : 'FAILED';
-
-            // Get the coverage report
-            const { execSync } = require('child_process');
-            let coverageReport;
-            try {
-              coverageReport = execSync('coverage report', { encoding: 'utf8' });
-            } catch (error) {
-              coverageReport = 'Unable to generate coverage report';
-            }
-
-            const comment = `## ${emoji} Coverage Report - ${statusText}
-
-            **Current Coverage: ${coverage}%**
-            ${status === 'passed' ? '✅ Meets the 80% threshold requirement' : '❌ Below the 80% threshold requirement'}
-
-            <details>
-            <summary>📊 Detailed Coverage Report</summary>
-
-            \`\`\`
-            ${coverageReport}
-            \`\`\`
-
-            </details>
-
-            ${status === 'failed' ? '⚠️ **Action Required:** Please add more tests to improve coverage above 80%' : '🎉 Great job maintaining good test coverage!'}
-            `;
-
-            try {
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-              console.log('✅ Coverage comment posted successfully');
-            } catch (error) {
-              console.log('⚠️ Failed to post comment:', error.message);
-              console.log('Coverage: ' + coverage + '%');
-            }
+          pytest-coverage-path: ./coverage-report.txt
+          pytest-xml-coverage-path: ./coverage.xml
+          title: "🧪 Differential Coverage Report"
+          badge-title: "Coverage"
+          report-only-changed-files: true
+          hide-comment: false
+          default-branch: ${{ github.base_ref }}
+          remove-links-to-files: false
+          remove-links-to-lines: false
 
       - name: Add coverage to job summary
         if: always()
         run: |
           COVERAGE="${{ steps.coverage_check.outputs.coverage }}"
           STATUS="${{ steps.coverage_check.outputs.status }}"
+          TYPE="${{ steps.coverage_check.outputs.type }}"
+          IS_CHANGED="${{ steps.changed-files.outputs.any_changed }}"
 
           if [ "$STATUS" = "passed" ]; then
             EMOJI="✅"
@@ -191,15 +310,36 @@ jobs:
             STATUS_TEXT="FAILED"
           fi
 
-          echo "## ${EMOJI} Coverage Report - ${STATUS_TEXT}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Current Coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "$STATUS" = "passed" ]; then
-            echo "✅ Meets the 80% threshold requirement" >> $GITHUB_STEP_SUMMARY
+          if [ "$TYPE" = "differential" ]; then
+            if [ "$IS_CHANGED" = "true" ]; then
+              echo "## ${EMOJI} Differential Coverage Report - ${STATUS_TEXT}" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**🎯 Coverage Check**: Only modified files checked for 80% threshold" >> $GITHUB_STEP_SUMMARY
+              echo "**📊 Overall Project Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              if [ "$STATUS" = "passed" ]; then
+                echo "✅ All modified files meet the 80% coverage requirement" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "❌ Some modified files are below the 80% coverage requirement" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "## ✅ Coverage Report - PASSED" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**🎯 Coverage Check**: No Python files were modified" >> $GITHUB_STEP_SUMMARY
+              echo "**📊 Overall Project Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "✅ No coverage check required as no Python source files were changed" >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "❌ Below the 80% threshold requirement" >> $GITHUB_STEP_SUMMARY
+            echo "## ${EMOJI} Full Coverage Report - ${STATUS_TEXT}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**📊 Full Project Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            if [ "$STATUS" = "passed" ]; then
+              echo "✅ Meets the 80% threshold requirement" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Below the 80% threshold requirement" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -207,7 +347,11 @@ jobs:
           echo "<summary>📊 Detailed Coverage Report</summary>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          coverage report >> $GITHUB_STEP_SUMMARY
+          if coverage report > /dev/null 2>&1; then
+            coverage report >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage report not available" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "</details>" >> $GITHUB_STEP_SUMMARY

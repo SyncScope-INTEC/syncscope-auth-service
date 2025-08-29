@@ -191,11 +191,12 @@ class ProfileView(ServerlessViewMixin, APIView):
     post=extend_schema(
         tags=["User Profile"],
         summary="Change password",
-        description="Change current user's password. Requires old password for verification.",
+        description="Change current user's password. Requires old password for verification. **Authentication required: Include 'Bearer <access_token>' in Authorization header.**",
         request=PasswordChangeSerializer,
         responses={
             200: PasswordChangeResponseSerializer,
             400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
         },
     )
 )
