@@ -192,7 +192,7 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
 
         # This should create a new user since email doesn't match
         user = create_or_update_user_from_github(self.github_data)
-        
+
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
@@ -205,11 +205,11 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
 
         # This should update the existing user
         user = create_or_update_user_from_github(self.github_data)
-        
+
         self.assertEqual(user.id, existing_user.id)  # Same user
         self.assertEqual(user.email, "test@example.com")
-        self.assertEqual(user.first_name, "Old")   # Preserved existing name
-        self.assertEqual(user.last_name, "User")   # Preserved existing name
+        self.assertEqual(user.first_name, "Old")  # Preserved existing name
+        self.assertEqual(user.last_name, "User")  # Preserved existing name
 
     def test_create_or_update_user_existing_email_with_company(self):
         """Test updating existing user with company"""
@@ -218,16 +218,16 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
 
         # This should update the existing user
         user = create_or_update_user_from_github(self.github_data)
-        
+
         self.assertEqual(user.id, existing_user.id)  # Same user
         self.assertEqual(user.email, "test@example.com")
-        self.assertEqual(user.first_name, "Old")   # Preserved existing name
-        self.assertEqual(user.last_name, "User")   # Preserved existing name
+        self.assertEqual(user.first_name, "Old")  # Preserved existing name
+        self.assertEqual(user.last_name, "User")  # Preserved existing name
 
     def test_create_new_user(self):
         """Test creating new user"""
         user = create_or_update_user_from_github(self.github_data)
-        
+
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
@@ -241,7 +241,7 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         github_data["company"] = None
 
         user = create_or_update_user_from_github(github_data)
-        
+
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
@@ -254,10 +254,10 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         github_data["name"] = None
 
         user = create_or_update_user_from_github(github_data)
-        
+
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "")  # Empty since no name provided
-        self.assertEqual(user.last_name, "")   # Empty since no name provided
+        self.assertEqual(user.last_name, "")  # Empty since no name provided
         self.assertEqual(user.role, "developer")
 
     def test_create_new_user_empty_name(self):
@@ -266,10 +266,10 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         github_data["name"] = ""
 
         user = create_or_update_user_from_github(github_data)
-        
+
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "")  # Empty since name is empty
-        self.assertEqual(user.last_name, "")   # Empty since name is empty
+        self.assertEqual(user.last_name, "")  # Empty since name is empty
         self.assertEqual(user.role, "developer")
 
     def test_create_new_user_single_name(self):
@@ -278,10 +278,10 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         github_data["name"] = "SingleName"
 
         user = create_or_update_user_from_github(github_data)
-        
+
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "SingleName")  # First name gets the single name
-        self.assertEqual(user.last_name, "")             # Last name is empty
+        self.assertEqual(user.last_name, "")  # Last name is empty
         self.assertEqual(user.role, "developer")
 
 
