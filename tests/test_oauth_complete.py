@@ -314,7 +314,7 @@ class TestGitHubOAuthViews(APITestCase):
 
     def test_github_oauth_callback_no_code(self):
         """Test OAuth callback without code"""
-        response = self.client.post(self.callback_url, {})
+        response = self.client.get(self.callback_url)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("error", response.data)
@@ -325,7 +325,7 @@ class TestGitHubOAuthViews(APITestCase):
         mock_settings.GITHUB_CLIENT_ID = None
         mock_settings.GITHUB_CLIENT_SECRET = None
 
-        response = self.client.post(self.callback_url, {"code": "test_code"})
+        response = self.client.get(self.callback_url + "?code=test_code")
 
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         self.assertIn("error", response.data)
@@ -351,7 +351,7 @@ class TestGitHubOAuthViews(APITestCase):
         mock_get_tokens.return_value = {"access": "token", "refresh": "token"}
         mock_create_session.return_value = (MagicMock(), "session_token")
 
-        response = self.client.post(self.callback_url, {"code": "test_code"})
+        response = self.client.get(self.callback_url + "?code=test_code")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("message", response.data)
@@ -368,7 +368,7 @@ class TestGitHubOAuthViews(APITestCase):
 
         mock_exchange.side_effect = requests.RequestException("GitHub API error")
 
-        response = self.client.post(self.callback_url, {"code": "test_code"})
+        response = self.client.get(self.callback_url + "?code=test_code")
 
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
         self.assertIn("error", response.data)
@@ -386,7 +386,7 @@ class TestGitHubOAuthViews(APITestCase):
         mock_get_user_data.return_value = {}
         mock_create_user.side_effect = ValueError("Invalid user data")
 
-        response = self.client.post(self.callback_url, {"code": "test_code"})
+        response = self.client.get(self.callback_url + "?code=test_code")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("error", response.data)
@@ -400,7 +400,7 @@ class TestGitHubOAuthViews(APITestCase):
 
         mock_exchange.side_effect = Exception("Unexpected error")
 
-        response = self.client.post(self.callback_url, {"code": "test_code"})
+        response = self.client.get(self.callback_url + "?code=test_code")
 
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         self.assertIn("error", response.data)
