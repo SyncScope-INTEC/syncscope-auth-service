@@ -69,11 +69,11 @@ def create_or_update_user_from_github(github_data):
     raise ValueError("GitHub OAuth is currently disabled due to deprecated field dependencies")
 
 
-@api_view(["POST"])
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def github_oauth_callback(request):
     """Handle GitHub OAuth callback"""
-    code = request.data.get("code")
+    code = request.GET.get("code")
 
     if not code:
         return Response({"error": "Authorization code is required"}, status=status.HTTP_400_BAD_REQUEST)
