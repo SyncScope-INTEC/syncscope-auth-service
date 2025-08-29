@@ -67,9 +67,9 @@ def create_or_update_user_from_github(github_data):
     email = github_data.get("email")
     if not email:
         raise ValueError("GitHub account must have a verified email address")
-    
+
     email = email.lower()
-    
+
     # Try to find existing user by email
     try:
         user = User.objects.get(email=email)
@@ -80,35 +80,32 @@ def create_or_update_user_from_github(github_data):
                 user.first_name = name_parts[0]
             if len(name_parts) > 1 and not user.last_name:
                 user.last_name = name_parts[1]
-        
+
         user.save()
         return user
-        
+
     except User.DoesNotExist:
         # Create new user
         name_parts = []
         if github_data.get("name"):
             name_parts = github_data["name"].split(" ", 1)
-        
+
         # Handle company creation/assignment
         company = None
         if github_data.get("company"):
             company_name = github_data["company"].strip()
             if company_name:
                 domain = extract_domain_from_email(email)
-                company, _ = Company.objects.get_or_create(
-                    name=company_name,
-                    defaults={"domain": domain}
-                )
-        
+                company, _ = Company.objects.get_or_create(name=company_name, defaults={"domain": domain})
+
         user = User.objects.create_user(
             email=email,
             first_name=name_parts[0] if name_parts else "",
             last_name=name_parts[1] if len(name_parts) > 1 else "",
             company=company,
-            role="developer"  # Default role for OAuth users
+            role="developer",  # Default role for OAuth users
         )
-        
+
         return user
 
 
