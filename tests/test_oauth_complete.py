@@ -183,84 +183,106 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         with self.assertRaises(ValueError) as cm:
             create_or_update_user_from_github(github_data)
 
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        self.assertIn("GitHub account must have a verified email address", str(cm.exception))
 
     def test_create_or_update_user_existing_github_id(self):
-        """Test updating existing user by GitHub ID"""
-        # Create existing user
+        """Test creating new user when no existing user with same email"""
+        # Create existing user with different email
         existing_user = User.objects.create_user(email="old@example.com", first_name="Old", last_name="User")
 
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(self.github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        # This should create a new user since email doesn't match
+        user = create_or_update_user_from_github(self.github_data)
+        
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "Test")
+        self.assertEqual(user.last_name, "User")
+        self.assertEqual(user.role, "developer")
 
     def test_create_or_update_user_existing_email(self):
         """Test updating existing user by email"""
         # Create existing user
         existing_user = User.objects.create_user(email="test@example.com", first_name="Old", last_name="User")
 
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(self.github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        # This should update the existing user
+        user = create_or_update_user_from_github(self.github_data)
+        
+        self.assertEqual(user.id, existing_user.id)  # Same user
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "Old")   # Preserved existing name
+        self.assertEqual(user.last_name, "User")   # Preserved existing name
 
     def test_create_or_update_user_existing_email_with_company(self):
         """Test updating existing user with company"""
         # Create existing user
         existing_user = User.objects.create_user(email="test@example.com", first_name="Old", last_name="User")
 
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(self.github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        # This should update the existing user
+        user = create_or_update_user_from_github(self.github_data)
+        
+        self.assertEqual(user.id, existing_user.id)  # Same user
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "Old")   # Preserved existing name
+        self.assertEqual(user.last_name, "User")   # Preserved existing name
 
     def test_create_new_user(self):
         """Test creating new user"""
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(self.github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        user = create_or_update_user_from_github(self.github_data)
+        
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "Test")
+        self.assertEqual(user.last_name, "User")
+        self.assertEqual(user.role, "developer")
+        self.assertIsNotNone(user.company)
+        self.assertEqual(user.company.name, "Test Company")
 
     def test_create_new_user_no_company(self):
         """Test creating new user without company"""
         github_data = self.github_data.copy()
         github_data["company"] = None
 
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        user = create_or_update_user_from_github(github_data)
+        
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "Test")
+        self.assertEqual(user.last_name, "User")
+        self.assertEqual(user.role, "developer")
+        self.assertIsNone(user.company)
 
     def test_create_new_user_no_name(self):
         """Test creating new user without name"""
         github_data = self.github_data.copy()
         github_data["name"] = None
 
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        user = create_or_update_user_from_github(github_data)
+        
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "")  # Empty since no name provided
+        self.assertEqual(user.last_name, "")   # Empty since no name provided
+        self.assertEqual(user.role, "developer")
 
     def test_create_new_user_empty_name(self):
         """Test creating new user with empty name"""
         github_data = self.github_data.copy()
         github_data["name"] = ""
 
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        user = create_or_update_user_from_github(github_data)
+        
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "")  # Empty since name is empty
+        self.assertEqual(user.last_name, "")   # Empty since name is empty
+        self.assertEqual(user.role, "developer")
 
     def test_create_new_user_single_name(self):
         """Test creating new user with single name"""
         github_data = self.github_data.copy()
         github_data["name"] = "SingleName"
 
-        with self.assertRaises(ValueError) as cm:
-            create_or_update_user_from_github(github_data)
-
-        self.assertIn("GitHub OAuth is currently disabled", str(cm.exception))
+        user = create_or_update_user_from_github(github_data)
+        
+        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.first_name, "SingleName")  # First name gets the single name
+        self.assertEqual(user.last_name, "")             # Last name is empty
+        self.assertEqual(user.role, "developer")
 
 
 class TestGitHubOAuthViews(APITestCase):
