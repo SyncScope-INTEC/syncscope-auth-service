@@ -1,0 +1,75 @@
+# Dependabot configuration for automatic dependency updates
+# This will create pull requests for dependency updates and security fixes
+
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    # Enable security updates
+    open-pull-requests-limit: 10
+    assignees:
+      - "AlejandroBeltre"
+    commit-message:
+      prefix: "deps:"
+      include: "scope"
+    # Auto-merge minor and patch updates for known safe packages
+    target-branch: "dev"
+    # Group similar updates together
+    groups:
+      django-updates:
+        patterns:
+          - "django*"
+        update-types:
+          - "minor"
+          - "patch"
+      rest-framework-updates:
+        patterns:
+          - "*rest*"
+          - "*drf*"
+        update-types:
+          - "minor"
+          - "patch"
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    # Ignore specific packages if needed (uncomment and modify as needed)
+    # ignore:
+    #   - dependency-name: "some-package"
+    #     update-types: ["version-update:semver-major"]
+    
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    assignees:
+      - "AlejandroBeltre"
+    commit-message:
+      prefix: "ci:"
+      include: "scope"
+    target-branch: "dev"
+    
+  # Docker dependencies (if you have Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    assignees:
+      - "AlejandroBeltre"
+    commit-message:
+      prefix: "docker:"
+      include: "scope"
+    target-branch: "dev"

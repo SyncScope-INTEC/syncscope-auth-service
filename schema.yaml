@@ -1,0 +1,976 @@
+openapi: 3.0.3
+info:
+  title: SyncScope Auth Service API
+  version: 1.0.0
+  description: Authentication and user management service for SyncScope platform
+  contact:
+    name: SyncScope Development Team
+    email: dev@syncscope.com
+  license:
+    name: MIT License
+paths:
+  /:
+    get:
+      operationId: root_retrieve
+      description: API Home page showing main navigation routes and service links.
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /auth/change-password/:
+    post:
+      operationId: change_password_create
+      description: Change current user's password. Requires old password for verification.
+      summary: Change password
+      tags:
+      - User Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordChangeResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /auth/github/callback/:
+    post:
+      operationId: github_callback_create
+      description: Handle GitHub OAuth callback
+      tags:
+      - github
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /auth/github/url/:
+    get:
+      operationId: github_url_retrieve
+      description: Get GitHub OAuth URL
+      tags:
+      - github
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /auth/health/:
+    get:
+      operationId: health_retrieve
+      description: Check the health status of the service including database and cache
+        connections.
+      summary: Health check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    example: '2024-01-01T12:00:00Z'
+                  version:
+                    type: string
+                    example: 1.0.0
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: healthy
+                      cache:
+                        type: string
+                        example: healthy
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  errors:
+                    type: array
+                    items:
+                      type: string
+          description: ''
+  /auth/health/live/:
+    get:
+      operationId: health_live_retrieve
+      description: Check if the service is alive (basic endpoint for load balancers).
+      summary: Liveness check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: alive
+          description: ''
+  /auth/health/ready/:
+    get:
+      operationId: health_ready_retrieve
+      description: Check if the service is ready to accept requests.
+      summary: Readiness check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not ready
+          description: ''
+  /auth/login/:
+    post:
+      operationId: login_create
+      description: Authenticate user with email and password. Returns JWT tokens and
+        session token.
+      summary: User login
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+        required: true
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /auth/logout/:
+    post:
+      operationId: logout_create
+      description: Logout user by blacklisting refresh token and/or terminating session.
+      summary: User logout
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+          description: ''
+  /auth/profile/:
+    get:
+      operationId: profile_retrieve
+      description: Get current user's profile information.
+      summary: Get user profile
+      tags:
+      - User Profile
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    put:
+      operationId: profile_update
+      description: Update current user's profile information.
+      summary: Update user profile
+      tags:
+      - User Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /auth/refresh-token/:
+    post:
+      operationId: refresh_token_create
+      description: Refresh access token using refresh token.
+      summary: Refresh JWT token
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequestRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefreshResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /auth/register/:
+    post:
+      operationId: register_create
+      description: Create a new user account with email, password, and basic information.
+      summary: Register a new user
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+        required: true
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /auth/sessions/:
+    get:
+      operationId: sessions_list
+      description: Retrieve all active sessions for the current user.
+      summary: Get active user sessions
+      tags:
+      - Session Management
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSession'
+          description: ''
+    delete:
+      operationId: sessions_destroy
+      description: Terminate a specific session by ID or all user sessions if no session_id
+        provided.
+      summary: Terminate user sessions
+      tags:
+      - Session Management
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionTerminationResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /auth/supervised-users/:
+    get:
+      operationId: supervised_users_retrieve
+      description: Get list of users supervised by the current user or all supervised
+        users if admin.
+      summary: List supervised users
+      tags:
+      - Supervision
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: supervised_users_create
+      description: Create a new supervisor-supervised user relationship.
+      summary: Create supervision relationship
+      tags:
+      - Supervision
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupervisedUserCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SupervisedUserCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SupervisedUserCreateRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: No response body
+  /auth/supervised-users/{id}/:
+    get:
+      operationId: supervised_users_retrieve_2
+      description: Get details of a specific supervision relationship.
+      summary: Get supervision relationship
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Supervision
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: supervised_users_update
+      description: Update monitoring settings for a supervision relationship.
+      summary: Update supervision relationship
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Supervision
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: supervised_users_destroy
+      description: Remove a supervision relationship.
+      summary: Delete supervision relationship
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Supervision
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: No response body
+  /auth/verify-token/:
+    post:
+      operationId: verify_token_create
+      description: Verify JWT token validity and return user information. Used by
+        other services for authentication.
+      summary: Verify JWT token
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenVerificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenVerificationRequest'
+        required: true
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerificationResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerificationResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerificationResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerificationResponse'
+          description: ''
+  /health/:
+    get:
+      operationId: health_retrieve_2
+      description: Check the health status of the service including database and cache
+        connections.
+      summary: Health check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    example: '2024-01-01T12:00:00Z'
+                  version:
+                    type: string
+                    example: 1.0.0
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: healthy
+                      cache:
+                        type: string
+                        example: healthy
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  errors:
+                    type: array
+                    items:
+                      type: string
+          description: ''
+components:
+  schemas:
+    AuthResponse:
+      type: object
+      description: Response serializer for authentication endpoints
+      properties:
+        message:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        tokens:
+          type: object
+          additionalProperties:
+            type: string
+        session_token:
+          type: string
+      required:
+      - message
+      - session_token
+      - tokens
+      - user
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        domain:
+          type: string
+          nullable: true
+          maxLength: 255
+        industry:
+          type: string
+          nullable: true
+          maxLength: 100
+        size:
+          type: string
+          nullable: true
+          maxLength: 50
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - updated_at
+    ErrorResponse:
+      type: object
+      description: Generic error response serializer
+      properties:
+        error:
+          type: string
+      required:
+      - error
+    LogoutRequest:
+      type: object
+      description: Serializer for logout requests
+      properties:
+        refresh_token:
+          type: string
+          minLength: 1
+          description: JWT refresh token to blacklist
+        session_token:
+          type: string
+          minLength: 1
+          description: Session token to terminate
+    LogoutResponse:
+      type: object
+      description: Response serializer for logout endpoint
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    PasswordChangeRequest:
+      type: object
+      properties:
+        old_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Current password for verification
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: New password (must be at least 8 characters long)
+        new_password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Confirm new password (optional but recommended)
+      required:
+      - new_password
+      - old_password
+    PasswordChangeResponse:
+      type: object
+      description: Response serializer for password change endpoint
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    SessionTerminationResponse:
+      type: object
+      description: Response serializer for session termination endpoint
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    SupervisedUserCreateRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          description: UUID of the user to be supervised
+        supervisor_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          description: UUID of the supervisor user
+        monitoring_enabled:
+          type: boolean
+      required:
+      - supervisor_id
+      - user_id
+    TokenRefreshRequestRequest:
+      type: object
+      description: Serializer for token refresh requests
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: JWT refresh token
+      required:
+      - refresh
+    TokenRefreshResponse:
+      type: object
+      description: Response serializer for token refresh endpoint
+      properties:
+        access:
+          type: string
+        message:
+          type: string
+      required:
+      - access
+      - message
+    TokenVerificationRequest:
+      type: object
+      description: Serializer for token verification requests
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: JWT access token to verify
+      required:
+      - token
+    TokenVerificationResponse:
+      type: object
+      description: Response serializer for token verification endpoint
+      properties:
+        valid:
+          type: boolean
+        user_id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        company_id:
+          type: string
+          nullable: true
+        error:
+          type: string
+      required:
+      - valid
+    UserLoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: User's password
+      required:
+      - email
+      - password
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        first_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        last_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        full_name:
+          type: string
+          readOnly: true
+        role:
+          enum:
+          - admin
+          - supervisor
+          - developer
+          type: string
+          description: |-
+            * `admin` - Admin
+            * `supervisor` - Supervisor
+            * `developer` - Developer
+          x-spec-enum-id: c71bdd685629017d
+        timezone:
+          type: string
+        company:
+          allOf:
+          - $ref: '#/components/schemas/Company'
+          readOnly: true
+        created_at:
+          type: string
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+        is_active:
+          type: boolean
+      required:
+      - company
+      - created_at
+      - date_joined
+      - email
+      - full_name
+      - id
+      - timezone
+      - updated_at
+    UserRegistrationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address (must be unique)
+          maxLength: 254
+        first_name:
+          type: string
+          nullable: true
+          description: User's first name
+          maxLength: 100
+        last_name:
+          type: string
+          nullable: true
+          description: User's last name
+          maxLength: 100
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Password must be at least 8 characters long
+        password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Re-enter password for confirmation
+        company_name:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Optional company name. If provided, a new company will be created
+            or linked.
+        role:
+          enum:
+          - admin
+          - supervisor
+          - developer
+          type: string
+          x-spec-enum-id: c71bdd685629017d
+          default: developer
+          description: |-
+            User role: developer, supervisor, or admin
+
+            * `admin` - Admin
+            * `supervisor` - Supervisor
+            * `developer` - Developer
+      required:
+      - email
+      - password
+      - password_confirm
+    UserSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+        user_agent:
+          type: string
+          readOnly: true
+          nullable: true
+        ip_address:
+          type: string
+          readOnly: true
+          nullable: true
+      required:
+      - created_at
+      - expires_at
+      - id
+      - ip_address
+      - user
+      - user_agent
+    UserUpdateRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        last_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 50
+servers:
+- url: http://localhost:8000
+  description: Local development server
+- url: https://syncscope-auth-service-dev.up.railway.app
+  description: Development server
+tags:
+- name: Authentication
+  description: User authentication endpoints including login, register, logout, and
+    token management
+- name: User Profile
+  description: User profile management endpoints
+- name: Session Management
+  description: User session tracking and management
+- name: Supervision
+  description: Supervisor-supervisee relationship management
+- name: Health
+  description: Service health check endpoints
