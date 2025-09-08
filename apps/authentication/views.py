@@ -1,6 +1,8 @@
+import os
+
 from django.contrib.auth import authenticate
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.template import loader
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -9,6 +11,7 @@ from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -546,3 +549,157 @@ class SupervisedUserDetailView(ServerlessViewMixin, APIView):
 
         supervised_user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["User Profile"],
+        summary="Upload user profile image",
+        description="Upload a profile image for a specific user. Only admins can upload images for other users. Users can only upload images for themselves.",
+        parameters=[
+            OpenApiParameter(
+                name="user_id",
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                description="UUID of the user",
+            )
+        ],
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "image": {"type": "string", "format": "binary", "description": "Profile image file (PNG/JPEG, max 5MB)"}
+                },
+            }
+        },
+        responses={
+            200: {"type": "object", "properties": {"message": {"type": "string"}, "profile_image_path": {"type": "string"}}},
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["User Profile"],
+        summary="Get user profile image",
+        description="Retrieve a user's profile image. Users can only retrieve their own images unless they are admins.",
+        parameters=[
+            OpenApiParameter(
+                name="user_id",
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                description="UUID of the user",
+            )
+        ],
+        responses={
+            200: {"type": "string", "format": "binary", "description": "Profile image file"},
+            404: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+        },
+    ),
+)
+class UserImageView(ServerlessViewMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_user_or_403(self, user_id, requesting_user):
+        """Get user with permission checking"""
+        try:
+            target_user = User.objects.get(id=user_id)
+
+            # Check permissions: users can only access their own images, admins can access any
+            if target_user == requesting_user or requesting_user.role == "admin":
+                return target_user
+            else:
+                return None
+
+        except (User.DoesNotExist, ValueError):
+            return None
+
+    @atomic_with_retry()
+    def post(self, request, user_id):
+        """Upload profile image for a user"""
+        target_user = self.get_user_or_403(user_id, request.user)
+        if not target_user:
+            return Response({"error": "User not found or access denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        image = request.FILES.get("image")
+        if not image:
+            return Response({"error": "No image file provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate file type
+        allowed_types = ["image/png", "image/jpeg", "image/jpg"]
+        if image.content_type not in allowed_types:
+            return Response({"error": "Only PNG and JPEG images are allowed"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate file size (5MB limit)
+        max_size = 5 * 1024 * 1024  # 5MB in bytes
+        if image.size > max_size:
+            return Response({"error": "Image file too large. Maximum size is 5MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure images directory exists
+        images_dir = "/images"
+        if not os.path.exists(images_dir):
+            os.makedirs(images_dir, exist_ok=True)
+
+        # Keep original filename but prefix with user_id to avoid conflicts
+        filename = f"{target_user.id}_{image.name}"
+        file_path = os.path.join(images_dir, filename)
+
+        # Remove old image if it exists
+        if target_user.profile_image_path:
+            old_file_path = os.path.join(images_dir, os.path.basename(target_user.profile_image_path))
+            if os.path.exists(old_file_path):
+                try:
+                    os.remove(old_file_path)
+                except OSError:
+                    pass  # Continue even if we can't delete the old file
+
+        # Save new image
+        try:
+            with open(file_path, "wb+") as destination:
+                for chunk in image.chunks():
+                    destination.write(chunk)
+
+            # Update user's profile_image_path
+            target_user.profile_image_path = filename
+            target_user.save(update_fields=["profile_image_path"])
+
+            return Response(
+                {"message": "Profile image uploaded successfully", "profile_image_path": filename}, status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return Response({"error": "Failed to save image file"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def get(self, request, user_id):
+        """Retrieve profile image for a user"""
+        target_user = self.get_user_or_403(user_id, request.user)
+        if not target_user:
+            return Response({"error": "User not found or access denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        if not target_user.profile_image_path:
+            raise Http404("Profile image not found")
+
+        # Construct full file path
+        images_dir = "/images"
+        file_path = os.path.join(images_dir, target_user.profile_image_path)
+
+        if not os.path.exists(file_path):
+            raise Http404("Profile image file not found")
+
+        # Return the image file
+        try:
+            # Determine content type based on file extension
+            content_type = "image/jpeg"  # default
+            if file_path.lower().endswith(".png"):
+                content_type = "image/png"
+
+            return FileResponse(
+                open(file_path, "rb"),
+                content_type=content_type,
+                as_attachment=False,
+                filename=os.path.basename(target_user.profile_image_path),
+            )
+        except Exception as e:
+            raise Http404("Could not retrieve profile image")

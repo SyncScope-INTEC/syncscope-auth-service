@@ -60,6 +60,9 @@ class User(RetryableModelMixin, AbstractUser):
     last_login = models.DateTimeField(null=True, blank=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
+    profile_image_path = models.CharField(
+        max_length=500, null=True, blank=True, help_text="Path to user profile image stored in Railway volume"
+    )
     # Remove fields that aren't in the new schema
     # is_verified = models.BooleanField(default=False)
     # github_id = models.CharField(max_length=50, null=True, blank=True, unique=True)

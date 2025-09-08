@@ -155,6 +155,7 @@ class TestAuthenticationAPI:
         # Check additional profile fields
         assert "date_joined" in response.data or "created_at" in response.data
         assert "updated_at" in response.data
+        assert "profile_image_path" in response.data
 
         # Check company information if user has a company
         if user.company:

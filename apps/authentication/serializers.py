@@ -130,8 +130,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "updated_at",
             "date_joined",
             "is_active",
+            "profile_image_path",
         ]
-        read_only_fields = ["id", "email", "created_at", "updated_at"]
+        read_only_fields = ["id", "email", "created_at", "updated_at", "profile_image_path"]
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

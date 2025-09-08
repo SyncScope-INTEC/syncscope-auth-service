@@ -11,12 +11,15 @@ from .views import (
     RegisterView,
     SupervisedUserDetailView,
     SupervisedUserListCreateView,
+    UserImageView,
     UserSessionsView,
     api_home,
     verify_token,
 )
 
 urlpatterns = [
+    # API Home
+    path("", api_home, name="api_home"),
     # Authentication endpoints
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", LoginView.as_view(), name="login"),
@@ -27,6 +30,8 @@ urlpatterns = [
     # User profile
     path("profile/", ProfileView.as_view(), name="profile"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
+    # User images
+    path("users/<uuid:user_id>/image/", UserImageView.as_view(), name="user_image"),
     # Session management
     path("sessions/", UserSessionsView.as_view(), name="user_sessions"),
     # Supervision management
