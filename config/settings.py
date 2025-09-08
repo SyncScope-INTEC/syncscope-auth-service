@@ -323,6 +323,16 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX": "/auth/",
     # Security scheme configuration
     "SECURITY": [{"Bearer": []}],
+    "COMPONENTS": {
+        "securitySchemes": {
+            "Bearer": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Enter your Bearer token in the format: Bearer <token>"
+            }
+        }
+    },
     "SERVERS": [
         {"url": "http://localhost:8000", "description": "Local development server"},
         {"url": "https://syncscope-auth-service-dev.up.railway.app", "description": "Development server"},
