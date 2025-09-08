@@ -5,7 +5,7 @@ Tests for user profile image upload and retrieval functionality
 import os
 import tempfile
 from io import BytesIO
-from unittest.mock import mock_open, patch
+from unittest.mock import mock_open, patch, call
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -206,8 +206,14 @@ class TestUserImageView(APITestCase):
         response = self.client.post(url, {"image": image_file}, format="multipart")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Verify old file removal was attempted
-        mock_remove.assert_called_once()
+        # Verify both test file and old image removal were attempted
+        # Should call remove twice: once for .test_write, once for old_image.png
+        self.assertEqual(mock_remove.call_count, 2)
+        # Check that both files were removed (use any_order due to OS path differences)
+        test_write_called = any(".test_write" in str(call_obj) for call_obj in mock_remove.call_args_list)
+        old_image_called = any("old_image.png" in str(call_obj) for call_obj in mock_remove.call_args_list)
+        self.assertTrue(test_write_called, "Test write file should be removed")
+        self.assertTrue(old_image_called, "Old image file should be removed")
 
     @patch("os.path.exists")
     def test_get_image_success(self, mock_exists):
@@ -316,11 +322,20 @@ class TestUserImageView(APITestCase):
 
         image_file = self.create_upload_file()
 
-        with patch("builtins.open", mock_open()):
+        with patch("builtins.open", mock_open()) as mock_file:
+            # Mock the open call to simulate permission error for the test file
+            def open_side_effect(filename, mode="r"):
+                if ".test_write" in filename:
+                    raise PermissionError("Permission denied")
+                return mock_open().return_value
+            
+            mock_file.side_effect = open_side_effect
             response = self.client.post(url, {"image": image_file}, format="multipart")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        mock_makedirs.assert_called_once_with("/images", exist_ok=True)
+        # Should try to create /images first, then fallback to /tmp/images
+        expected_calls = [call("/images", exist_ok=True), call("/tmp/images", exist_ok=True)]
+        mock_makedirs.assert_has_calls(expected_calls)
 
     @patch("os.path.exists")
     def test_get_image_png_content_type(self, mock_exists):
