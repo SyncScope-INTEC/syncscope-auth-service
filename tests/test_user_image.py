@@ -222,9 +222,8 @@ class TestUserImageView(APITestCase):
         url = reverse("user_image", kwargs={"user_id": self.user.id})
 
         with patch("builtins.open", mock_open(read_data=b"image_data")):
-            with patch("apps.authentication.views.FileResponse") as mock_file_response:
-                response = self.client.get(url)
-                mock_file_response.assert_called_once()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_get_image_no_authentication(self):
         """Test image retrieval without authentication"""
@@ -256,9 +255,8 @@ class TestUserImageView(APITestCase):
         url = reverse("user_image", kwargs={"user_id": self.other_user.id})
 
         with patch("builtins.open", mock_open(read_data=b"image_data")):
-            with patch("apps.authentication.views.FileResponse") as mock_file_response:
-                response = self.client.get(url)
-                mock_file_response.assert_called_once()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_get_image_no_image_path(self):
         """Test image retrieval when user has no image"""
@@ -336,12 +334,10 @@ class TestUserImageView(APITestCase):
         url = reverse("user_image", kwargs={"user_id": self.user.id})
 
         with patch("builtins.open", mock_open(read_data=b"image_data")):
-            with patch("apps.authentication.views.FileResponse") as mock_file_response:
-                response = self.client.get(url)
-
-                # Check that FileResponse was called with PNG content type
-                call_args = mock_file_response.call_args
-                self.assertEqual(call_args[1]["content_type"], "image/png")
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            # For PNG files, content type should be image/png
+            self.assertEqual(response["Content-Type"], "image/png")
 
     @patch("os.path.exists")
     def test_get_image_jpeg_content_type(self, mock_exists):
@@ -355,12 +351,10 @@ class TestUserImageView(APITestCase):
         url = reverse("user_image", kwargs={"user_id": self.user.id})
 
         with patch("builtins.open", mock_open(read_data=b"image_data")):
-            with patch("apps.authentication.views.FileResponse") as mock_file_response:
-                response = self.client.get(url)
-
-                # Check that FileResponse was called with JPEG content type (default)
-                call_args = mock_file_response.call_args
-                self.assertEqual(call_args[1]["content_type"], "image/jpeg")
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            # For JPEG files, content type should be image/jpeg
+            self.assertEqual(response["Content-Type"], "image/jpeg")
 
 
 @pytest.mark.django_db

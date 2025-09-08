@@ -18,8 +18,6 @@ from .views import (
 )
 
 urlpatterns = [
-    # API Home
-    path("", api_home, name="api_home"),
     # Authentication endpoints
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", LoginView.as_view(), name="login"),
