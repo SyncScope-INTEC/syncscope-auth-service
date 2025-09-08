@@ -637,23 +637,36 @@ class UserImageView(ServerlessViewMixin, APIView):
         if image.size > max_size:
             return Response({"error": "Image file too large. Maximum size is 5MB"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ensure images directory exists - use /tmp for Railway compatibility
+        # Use Railway volume mounted at /images
         images_dir = "/images"
         
-        # Fallback to /tmp if /images is not writable (Railway compatibility)
+        # Add logging for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Check if images directory exists and is writable
         try:
             if not os.path.exists(images_dir):
+                logger.info(f"Creating images directory: {images_dir}")
                 os.makedirs(images_dir, exist_ok=True)
+            
             # Test if directory is writable
             test_file = os.path.join(images_dir, '.test_write')
+            logger.info(f"Testing write permissions to: {images_dir}")
+            
             with open(test_file, 'w') as f:
                 f.write('test')
             os.remove(test_file)
-        except (OSError, PermissionError):
-            # Fallback to /tmp directory for Railway
+            
+            logger.info(f"Successfully verified write access to: {images_dir}")
+            
+        except (OSError, PermissionError) as e:
+            logger.error(f"Cannot write to {images_dir}: {str(e)}. Using fallback directory.")
+            # Fallback to /tmp directory
             images_dir = "/tmp/images"
             if not os.path.exists(images_dir):
                 os.makedirs(images_dir, exist_ok=True)
+            logger.info(f"Using fallback directory: {images_dir}")
 
         # Keep original filename but prefix with user_id to avoid conflicts
         filename = f"{target_user.id}_{image.name}"
@@ -687,10 +700,13 @@ class UserImageView(ServerlessViewMixin, APIView):
             )
 
         except Exception as e:
-            # Better error logging
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Image upload failed for user {target_user.id}: {str(e)}, images_dir: {images_dir}")
+            # Better error logging with directory info
+            logger.error(f"Image upload failed for user {target_user.id}: {str(e)}")
+            logger.error(f"Images directory: {images_dir}")
+            logger.error(f"File path: {file_path}")
+            logger.error(f"Directory exists: {os.path.exists(images_dir)}")
+            logger.error(f"Directory permissions: {oct(os.stat(images_dir).st_mode)[-3:] if os.path.exists(images_dir) else 'N/A'}")
+            
             return Response(
                 {"error": f"Failed to save image file: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
