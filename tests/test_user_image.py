@@ -5,7 +5,7 @@ Tests for user profile image upload and retrieval functionality
 import os
 import tempfile
 from io import BytesIO
-from unittest.mock import mock_open, patch, call
+from unittest.mock import call, mock_open, patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -328,7 +328,7 @@ class TestUserImageView(APITestCase):
                 if ".test_write" in filename:
                     raise PermissionError("Permission denied")
                 return mock_open().return_value
-            
+
             mock_file.side_effect = open_side_effect
             response = self.client.post(url, {"image": image_file}, format="multipart")
 
