@@ -323,7 +323,7 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX": "/auth/",
     # Security scheme configuration
     "SECURITY": [{"Bearer": []}],
-    "COMPONENTS": {
+    "APPEND_COMPONENTS": {
         "securitySchemes": {
             "Bearer": {
                 "type": "http",
