@@ -637,10 +637,23 @@ class UserImageView(ServerlessViewMixin, APIView):
         if image.size > max_size:
             return Response({"error": "Image file too large. Maximum size is 5MB"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ensure images directory exists
+        # Ensure images directory exists - use /tmp for Railway compatibility
         images_dir = "/images"
-        if not os.path.exists(images_dir):
-            os.makedirs(images_dir, exist_ok=True)
+        
+        # Fallback to /tmp if /images is not writable (Railway compatibility)
+        try:
+            if not os.path.exists(images_dir):
+                os.makedirs(images_dir, exist_ok=True)
+            # Test if directory is writable
+            test_file = os.path.join(images_dir, '.test_write')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+        except (OSError, PermissionError):
+            # Fallback to /tmp directory for Railway
+            images_dir = "/tmp/images"
+            if not os.path.exists(images_dir):
+                os.makedirs(images_dir, exist_ok=True)
 
         # Keep original filename but prefix with user_id to avoid conflicts
         filename = f"{target_user.id}_{image.name}"
@@ -648,12 +661,16 @@ class UserImageView(ServerlessViewMixin, APIView):
 
         # Remove old image if it exists
         if target_user.profile_image_path:
-            old_file_path = os.path.join(images_dir, os.path.basename(target_user.profile_image_path))
-            if os.path.exists(old_file_path):
-                try:
-                    os.remove(old_file_path)
-                except OSError:
-                    pass  # Continue even if we can't delete the old file
+            # Handle both /images and /tmp/images paths
+            old_filename = os.path.basename(target_user.profile_image_path)
+            for old_dir in ["/images", "/tmp/images"]:
+                old_file_path = os.path.join(old_dir, old_filename)
+                if os.path.exists(old_file_path):
+                    try:
+                        os.remove(old_file_path)
+                        break
+                    except OSError:
+                        pass  # Continue even if we can't delete the old file
 
         # Save new image
         try:
@@ -661,7 +678,7 @@ class UserImageView(ServerlessViewMixin, APIView):
                 for chunk in image.chunks():
                     destination.write(chunk)
 
-            # Update user's profile_image_path
+            # Update user's profile_image_path (store just filename, not full path)
             target_user.profile_image_path = filename
             target_user.save(update_fields=["profile_image_path"])
 
@@ -670,7 +687,14 @@ class UserImageView(ServerlessViewMixin, APIView):
             )
 
         except Exception as e:
-            return Response({"error": "Failed to save image file"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Better error logging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Image upload failed for user {target_user.id}: {str(e)}, images_dir: {images_dir}")
+            return Response(
+                {"error": f"Failed to save image file: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def get(self, request, user_id):
         """Retrieve profile image for a user"""
@@ -681,11 +705,18 @@ class UserImageView(ServerlessViewMixin, APIView):
         if not target_user.profile_image_path:
             raise Http404("Profile image not found")
 
-        # Construct full file path
-        images_dir = "/images"
-        file_path = os.path.join(images_dir, target_user.profile_image_path)
-
-        if not os.path.exists(file_path):
+        # Construct full file path - check both /images and /tmp/images
+        filename = target_user.profile_image_path
+        file_path = None
+        
+        # Try both possible directories
+        for images_dir in ["/images", "/tmp/images"]:
+            potential_path = os.path.join(images_dir, filename)
+            if os.path.exists(potential_path):
+                file_path = potential_path
+                break
+        
+        if not file_path:
             raise Http404("Profile image file not found")
 
         # Return the image file
