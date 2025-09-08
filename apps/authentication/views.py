@@ -639,27 +639,28 @@ class UserImageView(ServerlessViewMixin, APIView):
 
         # Use Railway volume mounted at /images
         images_dir = "/images"
-        
+
         # Add logging for debugging
         import logging
+
         logger = logging.getLogger(__name__)
-        
+
         # Check if images directory exists and is writable
         try:
             if not os.path.exists(images_dir):
                 logger.info(f"Creating images directory: {images_dir}")
                 os.makedirs(images_dir, exist_ok=True)
-            
+
             # Test if directory is writable
-            test_file = os.path.join(images_dir, '.test_write')
+            test_file = os.path.join(images_dir, ".test_write")
             logger.info(f"Testing write permissions to: {images_dir}")
-            
-            with open(test_file, 'w') as f:
-                f.write('test')
+
+            with open(test_file, "w") as f:
+                f.write("test")
             os.remove(test_file)
-            
+
             logger.info(f"Successfully verified write access to: {images_dir}")
-            
+
         except (OSError, PermissionError) as e:
             logger.error(f"Cannot write to {images_dir}: {str(e)}. Using fallback directory.")
             # Fallback to /tmp directory
@@ -705,12 +706,11 @@ class UserImageView(ServerlessViewMixin, APIView):
             logger.error(f"Images directory: {images_dir}")
             logger.error(f"File path: {file_path}")
             logger.error(f"Directory exists: {os.path.exists(images_dir)}")
-            logger.error(f"Directory permissions: {oct(os.stat(images_dir).st_mode)[-3:] if os.path.exists(images_dir) else 'N/A'}")
-            
-            return Response(
-                {"error": f"Failed to save image file: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            logger.error(
+                f"Directory permissions: {oct(os.stat(images_dir).st_mode)[-3:] if os.path.exists(images_dir) else 'N/A'}"
             )
+
+            return Response({"error": f"Failed to save image file: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request, user_id):
         """Retrieve profile image for a user"""
@@ -724,14 +724,14 @@ class UserImageView(ServerlessViewMixin, APIView):
         # Construct full file path - check both /images and /tmp/images
         filename = target_user.profile_image_path
         file_path = None
-        
+
         # Try both possible directories
         for images_dir in ["/images", "/tmp/images"]:
             potential_path = os.path.join(images_dir, filename)
             if os.path.exists(potential_path):
                 file_path = potential_path
                 break
-        
+
         if not file_path:
             raise Http404("Profile image file not found")
 
