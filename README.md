@@ -1,5 +1,10 @@
 # SyncScope Auth Service
 
+[![Build Status](https://github.com/AlejandroBeltre/syncscope-auth-service/workflows/CI/badge.svg)](https://github.com/AlejandroBeltre/syncscope-auth-service/actions)
+[![Coverage Status](https://coveralls.io/repos/github/AlejandroBeltre/syncscope-auth-service/badge.svg?branch=main)](https://coveralls.io/github/AlejandroBeltre/syncscope-auth-service?branch=main)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![Django Version](https://img.shields.io/badge/django-4.2+-green.svg)](https://djangoproject.com)
+
 Central authentication and user management service for the SyncScope developer productivity monitoring platform.
 
 ## Overview
