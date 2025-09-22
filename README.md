@@ -1,7 +1,7 @@
 # SyncScope Auth Service
 
-[![Build Status](https://github.com/SyncScope-INTEC/syncscope-auth-service/workflows/CI/badge.svg)](https://github.com/SyncScope-INTEC/syncscope-auth-service/actions)
-[![Coverage Status](https://coveralls.io/repos/github/SyncScope-INTEC/syncscope-auth-service/badge.svg?branch=main)](https://coveralls.io/github/SyncScope-INTEC/syncscope-auth-service?branch=main)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-development-orange.svg)](https://github.com/SyncScope-INTEC/syncscope-auth-service)
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![Django Version](https://img.shields.io/badge/django-4.2+-green.svg)](https://djangoproject.com)
 
@@ -13,15 +13,15 @@ The Auth Service is the foundational component of SyncScope, providing JWT-based
 
 ## Features
 
-- 🔐 JWT Authentication with refresh tokens and session management
-- 👥 Multi-tenant user management with company associations
-- 🔗 GitHub OAuth integration for developer accounts
-- 🛡️ Enterprise-grade security with rate limiting and validation
-- 🗄️ PostgreSQL with comprehensive schema (auth, management, analytics, monitoring, alerts)
-- 🔄 **Serverless-optimized with database retry logic**
-- 📊 Health checks and monitoring endpoints
-- 🐳 Docker support for containerized deployment
-- 🧪 Comprehensive test suite (31+ model tests, API integration tests)
+- JWT Authentication with refresh tokens and session management
+- Multi-tenant user management with company associations
+- GitHub OAuth integration for developer accounts
+- Enterprise-grade security with rate limiting and validation
+- PostgreSQL with comprehensive schema (auth, management, analytics, monitoring, alerts)
+- **Serverless-optimized with database retry logic**
+- Health checks and monitoring endpoints
+- Docker support for containerized deployment
+- Comprehensive test suite (31+ model tests, API integration tests)
 
 ## Architecture & Service Integration
 
