@@ -48,7 +48,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          # Fetch more history for proper diff comparison
+          # Fetch more history for proper diff coverage
           fetch-depth: 0
 
       - name: Set up Git for diff coverage
