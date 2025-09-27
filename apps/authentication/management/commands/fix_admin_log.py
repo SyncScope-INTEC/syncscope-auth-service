@@ -62,7 +62,7 @@ class Command(BaseCommand):
                 cursor.execute("ALTER TABLE django_admin_log DROP CONSTRAINT IF EXISTS django_admin_log_user_id_fkey CASCADE;")
 
                 self.stdout.write("Converting user_id column to UUID...")
-                cursor.execute("ALTER TABLE django_admin_log ALTER COLUMN user_id TYPE UUID USING NULL;")
+                cursor.execute("ALTER TABLE django_admin_log ALTER COLUMN user_id TYPE UUID;")
 
                 self.stdout.write("Re-adding foreign key constraint...")
                 cursor.execute(
