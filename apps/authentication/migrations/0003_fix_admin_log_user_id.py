@@ -19,10 +19,10 @@ def fix_admin_log_user_id_auth_service(apps, schema_editor):
         cursor.execute("SELECT current_schema();")
         current_schema = cursor.fetchone()[0]
 
-        # In CI/test, users table is in public schema as authentication_users
-        # In production, users table is in auth schema as users
+        # In CI/test, users table is in public schema as users (no schema prefix)
+        # In production, users table is in auth schema as auth.users
         if current_schema == 'public':
-            users_table = 'authentication_users'
+            users_table = 'users'
         else:
             users_table = 'auth.users'
 
