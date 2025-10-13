@@ -22,7 +22,7 @@ djangorestframework_simplejwt==5.5.1
 factory_boy==3.3.3
 Faker==37.8.0
 gunicorn==23.0.0
-idna==3.10
+idna==3.11
 iniconfig==2.1.0
 kombu==5.5.4
 packaging==25.0
