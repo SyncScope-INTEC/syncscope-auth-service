@@ -303,7 +303,8 @@ class TestUtilsConfiguration(TestCase):
         mock_user.id = 1
         mock_user.email = "test@example.com"
 
-        with patch("rest_framework_simplejwt.tokens.RefreshToken.for_user") as mock_token:
+        # Mock SecureRefreshToken.for_user since that's what get_tokens_for_user uses
+        with patch("apps.authentication.tokens.SecureRefreshToken.for_user") as mock_token:
             mock_refresh = MagicMock()
             mock_refresh.access_token = "access_token_value"
             mock_token.return_value = mock_refresh
