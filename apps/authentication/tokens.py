@@ -25,6 +25,7 @@ class SecureRefreshToken(RefreshToken):
         1. User exists and is active
         2. User account is not disabled
         3. Password hash is included for token invalidation on password change
+        4. User details (company_id, email, role, etc.) for other services
         """
         # Validate user exists and is active
         if not user or not user.is_active:
@@ -37,6 +38,15 @@ class SecureRefreshToken(RefreshToken):
         if hasattr(user, "password") and user.password:
             password_hash = hashlib.md5(user.password.encode()).hexdigest().upper()
             token["password_hash"] = password_hash
+
+        # Add user details for other services to consume
+        token["email"] = user.email
+        token["role"] = user.role
+        token["first_name"] = user.first_name or ""
+        token["last_name"] = user.last_name or ""
+        token["company_id"] = str(user.company.id) if user.company else None
+        token["is_staff"] = user.is_staff
+        token["is_superuser"] = user.is_superuser
 
         return token
 
@@ -82,6 +92,7 @@ class SecureAccessToken(AccessToken):
     def for_user(cls, user):
         """
         Enhanced for_user method with proper user validation.
+        Includes user details for other services to consume.
         """
         # Validate user exists and is active
         if not user or not user.is_active:
@@ -94,5 +105,14 @@ class SecureAccessToken(AccessToken):
         if hasattr(user, "password") and user.password:
             password_hash = hashlib.md5(user.password.encode()).hexdigest().upper()
             token["password_hash"] = password_hash
+
+        # Add user details for other services to consume
+        token["email"] = user.email
+        token["role"] = user.role
+        token["first_name"] = user.first_name or ""
+        token["last_name"] = user.last_name or ""
+        token["company_id"] = str(user.company.id) if user.company else None
+        token["is_staff"] = user.is_staff
+        token["is_superuser"] = user.is_superuser
 
         return token

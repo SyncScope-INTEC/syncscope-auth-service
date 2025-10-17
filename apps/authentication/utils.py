@@ -4,11 +4,11 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.utils import timezone
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.database_retry import database_retry
 
 from .models import UserSession
+from .tokens import SecureRefreshToken
 
 
 def generate_session_token():
@@ -50,8 +50,8 @@ def create_user_session(user, request=None):
 
 
 def get_tokens_for_user(user):
-    """Generate JWT tokens for user"""
-    refresh = RefreshToken.for_user(user)
+    """Generate JWT tokens for user with enhanced security and user details"""
+    refresh = SecureRefreshToken.for_user(user)
     return {
         "refresh": str(refresh),
         "access": str(refresh.access_token),
