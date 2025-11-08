@@ -1,6 +1,10 @@
+import uuid
+from datetime import datetime, timedelta
+
 import requests
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.core.cache import cache
 from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -114,6 +118,7 @@ def create_or_update_user_from_github(github_data):
 def github_oauth_callback(request):
     """Handle GitHub OAuth callback"""
     code = request.GET.get("code")
+    state = request.GET.get("state")  # Get state parameter if present
 
     if not code:
         return Response({"error": "Authorization code is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -130,23 +135,119 @@ def github_oauth_callback(request):
             session, session_token = create_user_session(user, request)
             tokens = get_tokens_for_user(user)
 
-            return Response(
-                {
-                    "message": "GitHub authentication successful",
-                    "user": UserProfileSerializer(user).data,
-                    "tokens": tokens,
-                    "session_token": session_token,
-                },
-                status=status.HTTP_200_OK,
-            )
+            response_data = {
+                "message": "GitHub authentication successful",
+                "user": UserProfileSerializer(user).data,
+                "tokens": tokens,
+                "session_token": session_token,
+            }
+
+            # If state parameter present, this is from desktop agent - store tokens in cache
+            if state:
+                cache_key = f"oauth_state_{state}"
+                state_data = cache.get(cache_key)
+
+                if state_data:
+                    # Update state with tokens
+                    cache.set(
+                        cache_key,
+                        {
+                            "status": "completed",
+                            "user": response_data["user"],
+                            "tokens": response_data["tokens"],
+                            "session_token": response_data["session_token"],
+                        },
+                        timeout=300,  # Keep for 5 minutes to allow agent to retrieve
+                    )
+
+                    # Return user-friendly success page for desktop agent
+                    from django.http import HttpResponse
+
+                    html = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>SyncScope - Authentication Success</title>
+                        <style>
+                            body {
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                height: 100vh;
+                                margin: 0;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            }
+                            .container {
+                                background: white;
+                                padding: 3rem;
+                                border-radius: 12px;
+                                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+                                text-align: center;
+                                max-width: 500px;
+                            }
+                            h1 {
+                                color: #6C63FF;
+                                margin-bottom: 1rem;
+                                font-size: 2rem;
+                            }
+                            p {
+                                color: #666;
+                                line-height: 1.6;
+                                margin-bottom: 1rem;
+                            }
+                            .checkmark {
+                                font-size: 4rem;
+                                color: #6C63FF;
+                                margin-bottom: 1rem;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="checkmark">✓</div>
+                            <h1>Authentication Successful!</h1>
+                            <p>You have successfully authenticated with GitHub.</p>
+                            <p><strong>You can now close this window and return to the SyncScope application.</strong></p>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    return HttpResponse(html, content_type="text/html")
+
+            # Regular web OAuth flow - return JSON
+            return Response(response_data, status=status.HTTP_200_OK)
 
     except requests.RequestException as e:
+        # If state present, update cache with error
+        if state:
+            cache_key = f"oauth_state_{state}"
+            if cache.get(cache_key):
+                cache.set(
+                    cache_key,
+                    {"status": "error", "error": f"GitHub API error: {str(e)}"},
+                    timeout=300,
+                )
         return Response({"error": f"GitHub API error: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     except ValueError as e:
+        # If state present, update cache with error
+        if state:
+            cache_key = f"oauth_state_{state}"
+            if cache.get(cache_key):
+                cache.set(cache_key, {"status": "error", "error": str(e)}, timeout=300)
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
+        # If state present, update cache with error
+        if state:
+            cache_key = f"oauth_state_{state}"
+            if cache.get(cache_key):
+                cache.set(
+                    cache_key,
+                    {"status": "error", "error": "OAuth authentication failed"},
+                    timeout=300,
+                )
         return Response({"error": "OAuth authentication failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -172,3 +273,83 @@ def github_oauth_url(request):
     )
 
     return Response({"oauth_url": oauth_url}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def github_oauth_initiate(request):
+    """Initiate GitHub OAuth flow for desktop agent - returns state ID and OAuth URL"""
+    if not settings.GITHUB_CLIENT_ID:
+        return Response({"error": "GitHub OAuth not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # Generate unique state ID for this auth session
+    state_id = str(uuid.uuid4())
+
+    # Store state in cache (expires in 10 minutes)
+    cache_key = f"oauth_state_{state_id}"
+    cache.set(
+        cache_key,
+        {
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat(),
+        },
+        timeout=600,  # 10 minutes
+    )
+
+    # Build redirect URI with state parameter
+    redirect_uri = request.build_absolute_uri("/auth/github/callback/")
+
+    # Ensure HTTPS for production deployments
+    if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
+        redirect_uri = redirect_uri.replace("http://", "https://")
+
+    oauth_url = (
+        f"https://github.com/login/oauth/authorize"
+        f"?client_id={settings.GITHUB_CLIENT_ID}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=user:email"
+        f"&state={state_id}"  # Include state for tracking
+    )
+
+    return Response(
+        {"state_id": state_id, "oauth_url": oauth_url, "expires_in": 600}, status=status.HTTP_200_OK
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def github_oauth_status(request, state_id):
+    """Check OAuth authentication status for desktop agent"""
+    cache_key = f"oauth_state_{state_id}"
+    state_data = cache.get(cache_key)
+
+    if not state_data:
+        return Response(
+            {"status": "expired", "error": "Authentication session expired or not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if state_data["status"] == "pending":
+        return Response({"status": "pending", "message": "Waiting for user to complete authentication"}, status=status.HTTP_200_OK)
+
+    elif state_data["status"] == "completed":
+        # Return tokens and clean up
+        response_data = {
+            "status": "completed",
+            "message": "Authentication successful",
+            "user": state_data["user"],
+            "tokens": state_data["tokens"],
+            "session_token": state_data["session_token"],
+        }
+
+        # Delete state from cache after retrieval
+        cache.delete(cache_key)
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    elif state_data["status"] == "error":
+        error_message = state_data.get("error", "Authentication failed")
+        cache.delete(cache_key)
+        return Response({"status": "error", "error": error_message}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({"status": "unknown", "error": "Invalid state"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .health import health_check, liveness_check, readiness_check
-from .oauth import github_oauth_callback, github_oauth_url
+from .oauth import github_oauth_callback, github_oauth_initiate, github_oauth_status, github_oauth_url
 from .views import (
     ChangePasswordView,
     CustomTokenRefreshView,
@@ -38,6 +38,9 @@ urlpatterns = [
     # OAuth endpoints
     path("github/url/", github_oauth_url, name="github_oauth_url"),
     path("github/callback/", github_oauth_callback, name="github_oauth_callback"),
+    # Desktop agent OAuth endpoints
+    path("github/initiate/", github_oauth_initiate, name="github_oauth_initiate"),
+    path("github/status/<str:state_id>/", github_oauth_status, name="github_oauth_status"),
     # Health check endpoints
     path("health/", health_check, name="health_check"),
     path("health/ready/", readiness_check, name="readiness_check"),
