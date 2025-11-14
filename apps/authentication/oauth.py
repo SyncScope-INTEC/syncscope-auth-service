@@ -311,9 +311,7 @@ def github_oauth_initiate(request):
         f"&state={state_id}"  # Include state for tracking
     )
 
-    return Response(
-        {"state_id": state_id, "oauth_url": oauth_url, "expires_in": 600}, status=status.HTTP_200_OK
-    )
+    return Response({"state_id": state_id, "oauth_url": oauth_url, "expires_in": 600}, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
@@ -330,7 +328,9 @@ def github_oauth_status(request, state_id):
         )
 
     if state_data["status"] == "pending":
-        return Response({"status": "pending", "message": "Waiting for user to complete authentication"}, status=status.HTTP_200_OK)
+        return Response(
+            {"status": "pending", "message": "Waiting for user to complete authentication"}, status=status.HTTP_200_OK
+        )
 
     elif state_data["status"] == "completed":
         # Return tokens and clean up
