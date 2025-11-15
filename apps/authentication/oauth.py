@@ -168,47 +168,179 @@ def github_oauth_callback(request):
                     <html>
                     <head>
                         <title>SyncScope - Authentication Success</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <style>
+                            * {
+                                margin: 0;
+                                padding: 0;
+                                box-sizing: border-box;
+                            }
+
                             body {
-                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
                                 display: flex;
                                 justify-content: center;
                                 align-items: center;
-                                height: 100vh;
-                                margin: 0;
-                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                min-height: 100vh;
+                                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%);
+                                padding: 20px;
                             }
+
                             .container {
-                                background: white;
-                                padding: 3rem;
-                                border-radius: 12px;
-                                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+                                background: rgba(255, 255, 255, 0.98);
+                                padding: 3rem 2.5rem;
+                                border-radius: 20px;
+                                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
                                 text-align: center;
                                 max-width: 500px;
+                                width: 100%;
+                                animation: slideIn 0.5s ease-out;
                             }
-                            h1 {
-                                color: #6C63FF;
-                                margin-bottom: 1rem;
-                                font-size: 2rem;
+
+                            @keyframes slideIn {
+                                from {
+                                    opacity: 0;
+                                    transform: translateY(30px);
+                                }
+                                to {
+                                    opacity: 1;
+                                    transform: translateY(0);
+                                }
                             }
-                            p {
-                                color: #666;
-                                line-height: 1.6;
-                                margin-bottom: 1rem;
+
+                            .logo-container {
+                                margin-bottom: 2rem;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
                             }
+
+                            .logo {
+                                width: 120px;
+                                height: 120px;
+                                animation: pulse 2s ease-in-out infinite;
+                            }
+
+                            @keyframes pulse {
+                                0%, 100% {
+                                    transform: scale(1);
+                                }
+                                50% {
+                                    transform: scale(1.05);
+                                }
+                            }
+
+                            .success-icon {
+                                width: 80px;
+                                height: 80px;
+                                margin: 0 auto 1.5rem;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                border-radius: 50%;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                animation: scaleIn 0.5s ease-out 0.3s both;
+                            }
+
+                            @keyframes scaleIn {
+                                from {
+                                    transform: scale(0);
+                                }
+                                to {
+                                    transform: scale(1);
+                                }
+                            }
+
                             .checkmark {
-                                font-size: 4rem;
-                                color: #6C63FF;
+                                font-size: 3rem;
+                                color: white;
+                                font-weight: bold;
+                            }
+
+                            h1 {
+                                color: #1a1a2e;
                                 margin-bottom: 1rem;
+                                font-size: 2.2rem;
+                                font-weight: 700;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                -webkit-background-clip: text;
+                                -webkit-text-fill-color: transparent;
+                                background-clip: text;
+                            }
+
+                            .subtitle {
+                                color: #4a5568;
+                                font-size: 1.1rem;
+                                margin-bottom: 1.5rem;
+                                line-height: 1.6;
+                            }
+
+                            .message {
+                                background: #f7fafc;
+                                border-left: 4px solid #667eea;
+                                padding: 1.25rem;
+                                border-radius: 8px;
+                                color: #2d3748;
+                                font-size: 1rem;
+                                line-height: 1.7;
+                                margin-top: 1.5rem;
+                            }
+
+                            .message strong {
+                                color: #1a202c;
+                                font-weight: 600;
+                            }
+
+                            .footer {
+                                margin-top: 2rem;
+                                padding-top: 1.5rem;
+                                border-top: 1px solid #e2e8f0;
+                                color: #718096;
+                                font-size: 0.9rem;
                             }
                         </style>
                     </head>
                     <body>
                         <div class="container">
-                            <div class="checkmark">✓</div>
+                            <div class="logo-container">
+                                <svg class="logo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                    <!-- SyncScope Logo SVG -->
+                                    <defs>
+                                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#CDFF00;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#9AFF00;stop-opacity:1" />
+                                        </linearGradient>
+                                        <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#B794F4;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#9F7AEA;stop-opacity:1" />
+                                        </linearGradient>
+                                    </defs>
+                                    <!-- Yellow S -->
+                                    <path d="M 80,50 L 100,50 L 100,90 L 120,90 L 120,110 L 100,110 L 100,150 L 80,150 L 80,110 L 60,110 L 60,90 L 80,90 Z"
+                                          fill="url(#grad1)" stroke="none"/>
+                                    <!-- Purple S -->
+                                    <path d="M 100,60 L 120,60 L 120,100 L 140,100 L 140,120 L 120,120 L 120,160 L 100,160 L 100,120 L 80,120 L 80,100 L 100,100 Z"
+                                          fill="url(#grad2)" stroke="none" opacity="0.9"/>
+                                </svg>
+                            </div>
+
+                            <div class="success-icon">
+                                <div class="checkmark">✓</div>
+                            </div>
+
                             <h1>Authentication Successful!</h1>
-                            <p>You have successfully authenticated with GitHub.</p>
-                            <p><strong>You can now close this window and return to the SyncScope application.</strong></p>
+
+                            <p class="subtitle">
+                                You have successfully authenticated with GitHub.
+                            </p>
+
+                            <div class="message">
+                                <strong>You can now close this window</strong> and return to the SyncScope application to start tracking your development activity.
+                            </div>
+
+                            <div class="footer">
+                                Powered by SyncScope
+                            </div>
                         </div>
                     </body>
                     </html>
