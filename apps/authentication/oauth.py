@@ -166,6 +166,9 @@ def github_oauth_callback(request):
                     logo_url = request.build_absolute_uri(
                         settings.STATIC_URL.rstrip("/") + "/authentication/images/SyncScope%20Logo.png"
                     )
+                    icon_url = request.build_absolute_uri(
+                        settings.STATIC_URL.rstrip("/") + "/authentication/images/icon.ico"
+                    )
 
                     html = """
                     <!DOCTYPE html>
@@ -173,7 +176,8 @@ def github_oauth_callback(request):
                     <head>
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <title>AWS-style Auth | SyncScope</title>
+                        <title>SyncScope Agent Login</title>
+                        <link rel="icon" href="{{ICON_URL}}" type="image/x-icon">
                         <style>
                             * {
                                 box-sizing: border-box;
@@ -318,6 +322,7 @@ def github_oauth_callback(request):
                     """
 
                     html = html.replace("{{LOGO_URL}}", logo_url)
+                    html = html.replace("{{ICON_URL}}", icon_url)
                     return HttpResponse(html, content_type="text/html")
 
             # Regular web OAuth flow - return JSON
