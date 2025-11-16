@@ -167,7 +167,9 @@ def github_oauth_callback(request):
                     logo_url = request.build_absolute_uri(
                         settings.STATIC_URL.rstrip("/") + "/authentication/images/SyncScope%20Logo.png"
                     )
-                    icon_url = request.build_absolute_uri(settings.STATIC_URL.rstrip("/") + "/authentication/images/icon.ico")
+                    icon_url = request.build_absolute_uri(
+                        settings.STATIC_URL.rstrip("/") + "/authentication/images/syncscope-logo.svg"
+                    )
 
                     template_str = """
                     <!DOCTYPE html>
@@ -176,7 +178,8 @@ def github_oauth_callback(request):
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <title>SyncScope Agent Login</title>
-                        <link rel="icon" href="{{ icon_url }}" type="image/x-icon">
+                        <link rel="icon" href="{{ icon_url }}" type="image/svg+xml">
+                        <link rel="alternate icon" href="{{ icon_url }}">
                         <style>
                             * {
                                 box-sizing: border-box;
