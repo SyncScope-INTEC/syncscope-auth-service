@@ -163,6 +163,10 @@ def github_oauth_callback(request):
                     # Return user-friendly success page for desktop agent
                     from django.http import HttpResponse
 
+                    logo_url = request.build_absolute_uri(
+                        settings.STATIC_URL.rstrip("/") + "/authentication/images/SyncScope%20Logo.png"
+                    )
+
                     html = """
                     <!DOCTYPE html>
                     <html lang="en">
@@ -187,21 +191,28 @@ def github_oauth_callback(request):
                                 padding: 32px 16px;
                             }
 
+                            .card-wrapper {
+                                width: 100%;
+                                max-width: 520px;
+                                margin: 0 auto;
+                            }
+
                             .card {
                                 background: #fff;
                                 border-radius: 16px;
-                                padding: 48px 40px;
+                                padding: 40px 32px;
                                 width: 100%;
-                                max-width: 520px;
                                 text-align: center;
                                 box-shadow: 0 18px 40px rgba(15, 17, 17, 0.12);
                                 border: 1px solid #d5dbdb;
                             }
 
                             .logo {
-                                width: 92px;
+                                width: 120px;
                                 margin: 0 auto 24px;
                                 display: block;
+                                image-rendering: -webkit-optimize-contrast;
+                                object-fit: contain;
                             }
 
                             .badge {
@@ -280,32 +291,33 @@ def github_oauth_callback(request):
                     </head>
                     <body>
                         <div class="card">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 86 30" class="logo" aria-label="AWS logo">
-                                <path fill="#232f3e" d="M24.5 3.2h5.4l3.7 16.1h-4.6l-.5-3.1H25l-.6 3.1h-4.4l4.5-16.1zm.7 9.6h2.8l-1.4-6.4-1.4 6.4zM41 3.2h4.3v9.4c0 1.6 1 2.6 2.5 2.6s2.6-1 2.6-2.6V3.2h4.3v9.4c0 4.5-2.6 7.1-6.9 7.1S41 17 41 12.6V3.2zm18.5 0h4l4.5 8.5V3.2h4.2v16.1h-3.8l-4.8-9v9h-4.1V3.2z"/>
-                                <path fill="#ff9900" d="M21.3 24.7c4.4 1.4 8.6 2.1 12.6 2.1 8.3 0 14.6-2.7 20.4-7.3.4-.3 1 .2.6.6-5.5 5.8-12.5 9-21.2 9-4.6 0-9.5-.8-15-2.4-.6-.1-.5-.9.1-1zm-.9-4.2c.4-.6 1.3-.4 1.3.4.1 5.4 3.5 8.7 11.1 9.5.7.1.7.9 0 .9-8.1 0-13.1-3.7-12.4-10.4z"/>
-                            </svg>
+                            <div class="card-wrapper">
+                                <img src="{{LOGO_URL}}" alt="SyncScope logo" class="logo" width="120" height="32" />
 
-                            <div class="badge" role="img" aria-label="Success">
+                                <div class="badge" role="img" aria-label="Success">
                                 <svg viewBox="0 0 64 64">
                                     <path d="M16 33l8.5 8.5L48 18" />
                                 </svg>
+                                </div>
+
+                                <h1>Request approved</h1>
+                                <p class="subtitle">SyncScope Agent now has access to your GitHub data.</p>
+
+                                <div class="panel">
+                                    <strong>You can close this window.</strong>
+                                    <p>Your desktop agent will automatically continue once it detects this approval.</p>
+                                </div>
+
+                                <p class="hint">Need to try again? Re-run the command from your terminal.</p>
+
+                                <div class="footer">Powered by SyncScope • Secure Auth Flow</div>
                             </div>
-
-                            <h1>Request approved</h1>
-                            <p class="subtitle">SyncScope Agent now has access to your GitHub data.</p>
-
-                            <div class="panel">
-                                <strong>You can close this window.</strong>
-                                <p>Your desktop agent will automatically continue once it detects this approval.</p>
-                            </div>
-
-                            <p class="hint">Need to try again? Re-run the command from your terminal.</p>
-
-                            <div class="footer">Powered by SyncScope • AWS-style auth flow</div>
                         </div>
                     </body>
                     </html>
                     """
+
+                    html = html.replace("{{LOGO_URL}}", logo_url)
                     return HttpResponse(html, content_type="text/html")
 
             # Regular web OAuth flow - return JSON
