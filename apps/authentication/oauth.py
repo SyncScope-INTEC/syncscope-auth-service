@@ -166,9 +166,7 @@ def github_oauth_callback(request):
                     logo_url = request.build_absolute_uri(
                         settings.STATIC_URL.rstrip("/") + "/authentication/images/SyncScope%20Logo.png"
                     )
-                    icon_url = request.build_absolute_uri(
-                        settings.STATIC_URL.rstrip("/") + "/authentication/images/icon.ico"
-                    )
+                    icon_url = request.build_absolute_uri(settings.STATIC_URL.rstrip("/") + "/authentication/images/icon.ico")
 
                     html = """
                     <!DOCTYPE html>
