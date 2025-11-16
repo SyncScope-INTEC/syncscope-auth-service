@@ -177,11 +177,11 @@ def github_oauth_callback(request):
                         <title>SyncScope Agent Login</title>
                         <link rel="icon" href="{{ICON_URL}}" type="image/x-icon">
                         <style>
-                            * {
+                            * {{
                                 box-sizing: border-box;
-                            }
+                            }}
 
-                            body {
+                            body {{
                                 font-family: 'Amazon Ember', 'Segoe UI', sans-serif;
                                 background: #f5f6f8;
                                 color: #0f1111;
@@ -191,15 +191,15 @@ def github_oauth_callback(request):
                                 align-items: center;
                                 justify-content: center;
                                 padding: 32px 16px;
-                            }
+                            }}
 
-                            .card-wrapper {
+                            .card-wrapper {{
                                 width: 100%;
                                 max-width: 520px;
                                 margin: 0 auto;
-                            }
+                            }}
 
-                            .card {
+                            .card {{
                                 background: #fff;
                                 border-radius: 16px;
                                 padding: 40px 32px;
@@ -207,18 +207,18 @@ def github_oauth_callback(request):
                                 text-align: center;
                                 box-shadow: 0 18px 40px rgba(15, 17, 17, 0.12);
                                 border: 1px solid #d5dbdb;
-                            }
+                            }}
 
-                            .logo {
+                            .logo {{
                                 max-width: 180px;
                                 height: auto;
                                 margin: 0 auto 24px;
                                 display: block;
                                 image-rendering: -webkit-optimize-contrast;
                                 object-fit: contain;
-                            }
+                            }}
 
-                            .badge {
+                            .badge {{
                                 width: 88px;
                                 height: 88px;
                                 margin: 0 auto 24px;
@@ -228,9 +228,9 @@ def github_oauth_callback(request):
                                 align-items: center;
                                 justify-content: center;
                                 background: linear-gradient(145deg, #f3fdfa, #e8f5ef);
-                            }
+                            }}
 
-                            .badge svg {
+                            .badge svg {{
                                 width: 40px;
                                 height: 40px;
                                 fill: none;
@@ -238,58 +238,58 @@ def github_oauth_callback(request):
                                 stroke-width: 8;
                                 stroke-linecap: round;
                                 stroke-linejoin: round;
-                            }
+                            }}
 
-                            h1 {
+                            h1 {{
                                 font-size: 1.75rem;
                                 font-weight: 600;
                                 margin-bottom: 12px;
-                            }
+                            }}
 
-                            .subtitle {
+                            .subtitle {{
                                 font-size: 1rem;
                                 color: #5f6a6a;
                                 margin-bottom: 28px;
-                            }
+                            }}
 
-                            .panel {
+                            .panel {{
                                 background: #f8fbfd;
                                 border: 1px solid #d5e3ec;
                                 border-radius: 12px;
                                 padding: 20px 24px;
                                 text-align: left;
                                 margin-bottom: 20px;
-                            }
+                            }}
 
-                            .panel strong {
+                            .panel strong {{
                                 display: block;
                                 font-size: 0.95rem;
                                 margin-bottom: 8px;
-                            }
+                            }}
 
-                            .panel p {
+                            .panel p {{
                                 margin: 0;
                                 font-size: 0.95rem;
                                 color: #374151;
-                            }
+                            }}
 
-                            .hint {
+                            .hint {{
                                 font-size: 0.9rem;
                                 color: #6b7280;
                                 margin-top: 16px;
-                            }
+                            }}
 
-                            .footer {
+                            .footer {{
                                 margin-top: 36px;
                                 font-size: 0.85rem;
                                 color: #9ca3af;
-                            }
+                            }}
 
-                            @media (max-width: 520px) {
-                                .card {
+                            @media (max-width: 520px) {{
+                                .card {{
                                     padding: 32px 24px;
-                                }
-                            }
+                                }}
+                            }}
                         </style>
                     </head>
                     <body>
