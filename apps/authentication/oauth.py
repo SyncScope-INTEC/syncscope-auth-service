@@ -162,26 +162,27 @@ def github_oauth_callback(request):
 
                     # Return user-friendly success page for desktop agent
                     from django.http import HttpResponse
+                    from django.template import Context, Template
 
                     logo_url = request.build_absolute_uri(
                         settings.STATIC_URL.rstrip("/") + "/authentication/images/SyncScope%20Logo.png"
                     )
                     icon_url = request.build_absolute_uri(settings.STATIC_URL.rstrip("/") + "/authentication/images/icon.ico")
 
-                    html = """
+                    template_str = """
                     <!DOCTYPE html>
                     <html lang="en">
                     <head>
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <title>SyncScope Agent Login</title>
-                        <link rel="icon" href="{{ICON_URL}}" type="image/x-icon">
+                        <link rel="icon" href="{{ icon_url }}" type="image/x-icon">
                         <style>
-                            * {{
+                            * {
                                 box-sizing: border-box;
-                            }}
+                            }
 
-                            body {{
+                            body {
                                 font-family: 'Amazon Ember', 'Segoe UI', sans-serif;
                                 background: #f5f6f8;
                                 color: #0f1111;
@@ -191,15 +192,15 @@ def github_oauth_callback(request):
                                 align-items: center;
                                 justify-content: center;
                                 padding: 32px 16px;
-                            }}
+                            }
 
-                            .card-wrapper {{
+                            .card-wrapper {
                                 width: 100%;
                                 max-width: 520px;
                                 margin: 0 auto;
-                            }}
+                            }
 
-                            .card {{
+                            .card {
                                 background: #fff;
                                 border-radius: 16px;
                                 padding: 40px 32px;
@@ -207,18 +208,18 @@ def github_oauth_callback(request):
                                 text-align: center;
                                 box-shadow: 0 18px 40px rgba(15, 17, 17, 0.12);
                                 border: 1px solid #d5dbdb;
-                            }}
+                            }
 
-                            .logo {{
+                            .logo {
                                 max-width: 180px;
                                 height: auto;
                                 margin: 0 auto 24px;
                                 display: block;
                                 image-rendering: -webkit-optimize-contrast;
                                 object-fit: contain;
-                            }}
+                            }
 
-                            .badge {{
+                            .badge {
                                 width: 88px;
                                 height: 88px;
                                 margin: 0 auto 24px;
@@ -228,9 +229,9 @@ def github_oauth_callback(request):
                                 align-items: center;
                                 justify-content: center;
                                 background: linear-gradient(145deg, #f3fdfa, #e8f5ef);
-                            }}
+                            }
 
-                            .badge svg {{
+                            .badge svg {
                                 width: 40px;
                                 height: 40px;
                                 fill: none;
@@ -238,64 +239,64 @@ def github_oauth_callback(request):
                                 stroke-width: 8;
                                 stroke-linecap: round;
                                 stroke-linejoin: round;
-                            }}
+                            }
 
-                            h1 {{
+                            h1 {
                                 font-size: 1.75rem;
                                 font-weight: 600;
                                 margin-bottom: 12px;
-                            }}
+                            }
 
-                            .subtitle {{
+                            .subtitle {
                                 font-size: 1rem;
                                 color: #5f6a6a;
                                 margin-bottom: 28px;
-                            }}
+                            }
 
-                            .panel {{
+                            .panel {
                                 background: #f8fbfd;
                                 border: 1px solid #d5e3ec;
                                 border-radius: 12px;
                                 padding: 20px 24px;
                                 text-align: left;
                                 margin-bottom: 20px;
-                            }}
+                            }
 
-                            .panel strong {{
+                            .panel strong {
                                 display: block;
                                 font-size: 0.95rem;
                                 margin-bottom: 8px;
-                            }}
+                            }
 
-                            .panel p {{
+                            .panel p {
                                 margin: 0;
                                 font-size: 0.95rem;
                                 color: #374151;
-                            }}
+                            }
 
-                            .hint {{
+                            .hint {
                                 font-size: 0.9rem;
                                 color: #6b7280;
                                 margin-top: 16px;
-                            }}
+                            }
 
-                            .footer {{
+                            .footer {
                                 margin-top: 36px;
                                 font-size: 0.85rem;
                                 color: #9ca3af;
-                            }}
+                            }
 
-                            @media (max-width: 520px) {{
-                                .card {{
+                            @media (max-width: 520px) {
+                                .card {
                                     padding: 32px 24px;
-                                }}
-                            }}
+                                }
+                            }
                         </style>
                     </head>
                     <body>
                         <div class="card">
                             <div class="card-wrapper">
-                                <img src="{{LOGO_URL}}" alt="SyncScope logo" class="logo" />
+                                <img src="{{ logo_url }}" alt="SyncScope logo" class="logo" />
 
                                 <div class="badge" role="img" aria-label="Success">
                                 <svg viewBox="0 0 64 64">
@@ -319,8 +320,9 @@ def github_oauth_callback(request):
                     </body>
                     </html>
                     """
-                    html = html.replace("{{LOGO_URL}}", logo_url)
-                    html = html.replace("{{ICON_URL}}", icon_url)
+                    template = Template(template_str)
+                    context = Context({"logo_url": logo_url, "icon_url": icon_url})
+                    html = template.render(context)
                     return HttpResponse(html, content_type="text/html")
 
             # Regular web OAuth flow - return JSON

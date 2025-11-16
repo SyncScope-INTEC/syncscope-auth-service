@@ -12,11 +12,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.authentication.models import Company, User
-from apps.authentication.oauth import (
-    create_or_update_user_from_github,
-    exchange_code_for_token,
-    get_github_user_data,
-)
+from apps.authentication.oauth import create_or_update_user_from_github, exchange_code_for_token, get_github_user_data
 
 
 class TestExchangeCodeForToken(TestCase):
