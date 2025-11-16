@@ -29,9 +29,19 @@ class SecurityHeadersMiddleware:
         if request.is_secure():
             response["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-        # CSP for API responses
-        if request.path.startswith("/auth/"):
-            response["Content-Security-Policy"] = "default-src 'none'; script-src 'none'; object-src 'none'"
+            # Define a more permissive CSP for specific paths that need it
+        if request.path.startswith("/auth/github/callback"):
+            # For OAuth callback, allow images and inline styles from self
+            csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; script-src 'none'; object-src 'none'"
+        else:
+            # Default restrictive CSP for other pages
+            csp = "default-src 'none'; script-src 'none'; object-src 'none'"
+
+        # Apply CSP to all HTML responses except for admin and docs
+        if response.get("Content-Type", "").startswith("text/html") and not any(
+            path in request.path for path in ["/admin", "/api/docs", "/api/redoc"]
+        ):
+            response["Content-Security-Policy"] = csp
 
         return response
 
