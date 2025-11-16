@@ -166,7 +166,9 @@ def github_oauth_callback(request):
                     logo_url = request.build_absolute_uri(
                         settings.STATIC_URL.rstrip("/") + "/authentication/images/SyncScope%20Logo.png"
                     )
-                    icon_url = request.build_absolute_uri(settings.STATIC_URL.rstrip("/") + "/authentication/images/icon.ico")
+                    icon_url = request.build_absolute_uri(
+                        settings.STATIC_URL.rstrip("/") + "/authentication/images/icon.ico"
+                    )
 
                     html = """
                     <!DOCTYPE html>
@@ -175,7 +177,7 @@ def github_oauth_callback(request):
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <title>SyncScope Agent Login</title>
-                        <link rel="icon" href="{{ICON_URL}}" type="image/x-icon">
+                        <link rel="icon" href="{ICON_URL}" type="image/x-icon">
                         <style>
                             * {
                                 box-sizing: border-box;
@@ -210,7 +212,8 @@ def github_oauth_callback(request):
                             }
 
                             .logo {
-                                width: 120px;
+                                max-width: 180px;
+                                height: auto;
                                 margin: 0 auto 24px;
                                 display: block;
                                 image-rendering: -webkit-optimize-contrast;
@@ -294,7 +297,7 @@ def github_oauth_callback(request):
                     <body>
                         <div class="card">
                             <div class="card-wrapper">
-                                <img src="{{LOGO_URL}}" alt="SyncScope logo" class="logo" width="120" height="32" />
+                                <img src="{LOGO_URL}" alt="SyncScope logo" class="logo" />
 
                                 <div class="badge" role="img" aria-label="Success">
                                 <svg viewBox="0 0 64 64">
@@ -317,10 +320,9 @@ def github_oauth_callback(request):
                         </div>
                     </body>
                     </html>
-                    """
-
-                    html = html.replace("{{LOGO_URL}}", logo_url)
-                    html = html.replace("{{ICON_URL}}", icon_url)
+                    """.format(
+                        LOGO_URL=logo_url, ICON_URL=icon_url
+                    )
                     return HttpResponse(html, content_type="text/html")
 
             # Regular web OAuth flow - return JSON
