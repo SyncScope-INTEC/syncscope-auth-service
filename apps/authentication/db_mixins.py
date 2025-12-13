@@ -139,6 +139,8 @@ class ServerlessViewMixin:
     """Mixin for views to handle serverless database connections"""
 
     def dispatch(self, request, *args, **kwargs):
+        from django.http import JsonResponse
+
         from config.database_retry import DatabaseHealthCheck, close_old_connections
 
         # Check database health before processing request
@@ -147,15 +149,11 @@ class ServerlessViewMixin:
 
             # Try one more time after closing connections
             if not DatabaseHealthCheck.is_healthy(use_cache=False):
-                from rest_framework import status
-                from rest_framework.response import Response
-
-                response = Response(
+                # Use JsonResponse to avoid DRF renderer issues
+                return JsonResponse(
                     {"error": "Service temporarily unavailable", "detail": "Database connection issue"},
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    status=503,
                 )
-                # Properly finalize the response to set the renderer
-                return self.finalize_response(request, response, *args, **kwargs)
 
         return super().dispatch(request, *args, **kwargs)
 
