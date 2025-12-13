@@ -107,7 +107,7 @@ class TestUserAdmin:
         user_admin = UserAdmin(User, admin.site)
         expected_fieldsets = (
             (None, {"fields": ("id", "email", "password")}),
-            ("Personal info", {"fields": ("first_name", "last_name", "timezone")}),
+            ("Personal info", {"fields": ("first_name", "last_name", "phone_number", "timezone")}),
             ("Company info", {"fields": ("company", "role")}),
             ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
             ("Important dates", {"fields": ("last_login", "date_joined", "updated_at")}),
@@ -122,7 +122,7 @@ class TestUserAdmin:
                 None,
                 {
                     "classes": ("wide",),
-                    "fields": ("email", "password1", "password2", "first_name", "last_name", "role", "company"),
+                    "fields": ("email", "password1", "password2", "first_name", "last_name", "phone_number", "role", "company"),
                 },
             ),
         )
