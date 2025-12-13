@@ -320,6 +320,8 @@ class TestServerlessViewMixin(TestCase):
     @patch("config.database_retry.DatabaseHealthCheck")
     def test_dispatch_database_remains_unhealthy(self, mock_health_check, mock_close_connections):
         """Test dispatch when database remains unhealthy"""
+        import json
+
         mock_health_check.is_healthy.return_value = False
 
         view = self.TestView()
@@ -329,9 +331,11 @@ class TestServerlessViewMixin(TestCase):
 
         mock_close_connections.assert_called_once()
         mock_health_check.is_healthy.assert_called_with(use_cache=False)
-        self.assertEqual(result.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertIn("error", result.data)
-        self.assertIn("Service temporarily unavailable", result.data["error"])
+        self.assertEqual(result.status_code, 503)
+        # JsonResponse returns content as bytes, need to decode
+        result_data = json.loads(result.content.decode("utf-8"))
+        self.assertIn("error", result_data)
+        self.assertIn("Service temporarily unavailable", result_data["error"])
 
     @patch("config.database_retry.is_retryable_error")
     @patch("config.database_retry.DatabaseHealthCheck")
