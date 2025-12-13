@@ -11,6 +11,7 @@ from .views import (
     RegisterView,
     SupervisedUserDetailView,
     SupervisedUserListCreateView,
+    UserByIdView,
     UserImageView,
     UserSessionsView,
     api_home,
@@ -27,6 +28,7 @@ urlpatterns = [
     path("verify-token/", verify_token, name="verify_token"),
     # User profile
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("users/<uuid:user_id>/", UserByIdView.as_view(), name="user_by_id"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
     # User images
     path("users/<uuid:user_id>/image/", UserImageView.as_view(), name="user_image"),

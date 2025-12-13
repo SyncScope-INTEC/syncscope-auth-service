@@ -164,6 +164,48 @@ class TestAuthenticationAPI:
             assert company_data["name"] == user.company.name
             assert company_data["domain"] == user.company.domain
 
+    def test_get_user_by_id(self, authenticated_client, user):
+        """Test getting user details by user ID"""
+        # Create another user to fetch
+        other_user = User.objects.create_user(
+            email="otheruser@test.com",
+            password="testpass123",
+            first_name="Other",
+            last_name="User",
+            role="developer",
+        )
+
+        url = reverse("user_by_id", kwargs={"user_id": other_user.id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["id"] == str(other_user.id)
+        assert response.data["email"] == other_user.email
+        assert response.data["first_name"] == other_user.first_name
+        assert response.data["last_name"] == other_user.last_name
+        assert response.data["role"] == other_user.role
+
+    def test_get_user_by_id_not_found(self, authenticated_client):
+        """Test getting user by non-existent ID"""
+        import uuid
+
+        fake_id = uuid.uuid4()
+        url = reverse("user_by_id", kwargs={"user_id": fake_id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "User not found" in response.data["error"]
+
+    def test_get_user_by_id_requires_authentication(self, api_client):
+        """Test that getting user by ID requires authentication"""
+        import uuid
+
+        fake_id = uuid.uuid4()
+        url = reverse("user_by_id", kwargs={"user_id": fake_id})
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
     def test_update_profile(self, authenticated_client, user):
         url = reverse("profile")
         data = {"first_name": "Updated", "last_name": "Name", "timezone": "America/New_York"}

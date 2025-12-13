@@ -190,6 +190,40 @@ class ProfileView(ServerlessViewMixin, APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=["User Profile"],
+    summary="Get user by ID",
+    description="Get user details by user ID. **Authentication required: Include 'Bearer <access_token>' in Authorization header.**",
+    parameters=[
+        OpenApiParameter(
+            name="user_id",
+            type=OpenApiTypes.UUID,
+            location=OpenApiParameter.PATH,
+            description="User ID (UUID)",
+            required=True,
+        )
+    ],
+    responses={
+        200: UserProfileSerializer,
+        404: ErrorResponseSerializer,
+        401: ErrorResponseSerializer,
+    },
+)
+class UserByIdView(ServerlessViewMixin, APIView):
+    """Get user details by user ID"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, user_id):
+        """Get user by ID"""
+        try:
+            user = User.objects.get(id=user_id)
+            serializer = UserProfileSerializer(user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
 @extend_schema_view(
     post=extend_schema(
         tags=["User Profile"],
