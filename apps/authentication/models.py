@@ -49,6 +49,7 @@ class User(RetryableModelMixin, AbstractUser):
     password = models.CharField(max_length=255, db_column="password_hash")
     first_name = models.CharField(max_length=100, null=True, blank=True)
     last_name = models.CharField(max_length=100, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="developer")
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name="users", null=True, blank=True, db_column="company_id"

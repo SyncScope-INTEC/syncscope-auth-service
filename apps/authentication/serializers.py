@@ -38,12 +38,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "first_name", "last_name", "password", "password_confirm", "company_name", "role"]
+        fields = ["email", "first_name", "last_name", "phone_number", "password", "password_confirm", "company_name", "role"]
         extra_kwargs = {
             "role": {"default": "developer", "help_text": "User role: developer, supervisor, or admin"},
             "email": {"help_text": "User's email address (must be unique)"},
             "first_name": {"help_text": "User's first name"},
             "last_name": {"help_text": "User's last name"},
+            "phone_number": {"required": False, "help_text": "User's phone number (optional)"},
         }
 
     @database_retry(max_retries=2)
@@ -122,6 +123,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "phone_number",
             "full_name",
             "role",
             "timezone",
@@ -138,7 +140,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "timezone"]
+        fields = ["first_name", "last_name", "phone_number", "timezone"]
 
     def validate_first_name(self, value):
         if not value or not value.strip():
