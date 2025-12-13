@@ -75,13 +75,13 @@ class TestUserAdmin:
     def test_list_display(self):
         """Test list_display configuration."""
         user_admin = UserAdmin(User, admin.site)
-        expected_fields = ["email", "first_name", "last_name", "role", "company", "is_active"]
+        expected_fields = ["email", "first_name", "last_name", "role", "plan", "company", "is_active"]
         assert user_admin.list_display == expected_fields
 
     def test_list_filter(self):
         """Test list_filter configuration."""
         user_admin = UserAdmin(User, admin.site)
-        expected_filters = ["role", "is_active", "is_staff", "company", "date_joined"]
+        expected_filters = ["role", "plan", "is_active", "is_staff", "company", "date_joined"]
         assert user_admin.list_filter == expected_filters
 
     def test_search_fields(self):
@@ -108,7 +108,7 @@ class TestUserAdmin:
         expected_fieldsets = (
             (None, {"fields": ("id", "email", "password")}),
             ("Personal info", {"fields": ("first_name", "last_name", "phone_number", "timezone")}),
-            ("Company info", {"fields": ("company", "role")}),
+            ("Company info", {"fields": ("company", "role", "plan")}),
             ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
             ("Important dates", {"fields": ("last_login", "date_joined", "updated_at")}),
         )
@@ -130,6 +130,7 @@ class TestUserAdmin:
                         "last_name",
                         "phone_number",
                         "role",
+                        "plan",
                         "company",
                     ),
                 },

@@ -44,6 +44,12 @@ class User(RetryableModelMixin, AbstractUser):
         ("developer", "Developer"),
     ]
 
+    PLAN_CHOICES = [
+        ("free", "Free"),
+        ("professional", "Professional"),
+        ("enterprise", "Enterprise"),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, validators=[EmailValidator()])
     password = models.CharField(max_length=255, db_column="password_hash")
@@ -51,6 +57,7 @@ class User(RetryableModelMixin, AbstractUser):
     last_name = models.CharField(max_length=100, null=True, blank=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="developer")
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default="free")
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name="users", null=True, blank=True, db_column="company_id"
     )
