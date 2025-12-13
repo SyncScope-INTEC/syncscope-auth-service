@@ -150,10 +150,12 @@ class ServerlessViewMixin:
                 from rest_framework import status
                 from rest_framework.response import Response
 
-                return Response(
+                response = Response(
                     {"error": "Service temporarily unavailable", "detail": "Database connection issue"},
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
+                # Properly finalize the response to set the renderer
+                return self.finalize_response(request, response, *args, **kwargs)
 
         return super().dispatch(request, *args, **kwargs)
 
