@@ -51,7 +51,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             "role": {"default": "developer", "help_text": "User role: developer, supervisor, or admin"},
-            "plan": {"default": "free", "help_text": "User plan: free, professional, or enterprise"},
+            "plan": {"default": "starter", "help_text": "User plan: starter, growth, or enterprise"},
             "email": {"help_text": "User's email address (must be unique)"},
             "first_name": {"help_text": "User's first name"},
             "last_name": {"help_text": "User's last name"},
@@ -126,6 +126,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(read_only=True)
     timezone = serializers.CharField()
     date_joined = serializers.DateTimeField(read_only=True)
+    plan_limits = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -138,6 +139,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "full_name",
             "role",
             "plan",
+            "plan_limits",
             "timezone",
             "company",
             "created_at",
@@ -147,6 +149,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "profile_image_path",
         ]
         read_only_fields = ["id", "email", "created_at", "updated_at", "profile_image_path"]
+
+    def get_plan_limits(self, obj):
+        """Get the limits and features for the user's plan"""
+        try:
+            return obj.get_plan_limits()
+        except ValueError:
+            return None
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
@@ -343,3 +352,14 @@ class SupervisedUserCreateSerializer(serializers.ModelSerializer):
         validated_data.pop("user_id")
         validated_data.pop("supervisor_id")
         return super().create(validated_data)
+
+
+class PlanLimitsSerializer(serializers.Serializer):
+    """Serializer for plan limits and features"""
+
+    display_name = serializers.CharField()
+    price = serializers.IntegerField()
+    max_users = serializers.IntegerField(allow_null=True, help_text="Maximum users allowed (null = unlimited)")
+    max_integrations = serializers.IntegerField(allow_null=True, help_text="Maximum integrations allowed (null = unlimited)")
+    features = serializers.ListField(child=serializers.CharField())
+    description = serializers.CharField()

@@ -45,8 +45,8 @@ class User(RetryableModelMixin, AbstractUser):
     ]
 
     PLAN_CHOICES = [
-        ("free", "Free"),
-        ("professional", "Professional"),
+        ("starter", "Starter"),
+        ("growth", "Growth"),
         ("enterprise", "Enterprise"),
     ]
 
@@ -57,7 +57,7 @@ class User(RetryableModelMixin, AbstractUser):
     last_name = models.CharField(max_length=100, null=True, blank=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="developer")
-    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default="free")
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default="starter")
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name="users", null=True, blank=True, db_column="company_id"
     )
@@ -114,6 +114,34 @@ class User(RetryableModelMixin, AbstractUser):
     def created_at(self):
         """Backward compatibility property for created_at"""
         return self.date_joined
+
+    def get_plan_limits(self):
+        """Get the limits and features for the user's current plan."""
+        from .plan_limits import get_plan_limits
+
+        return get_plan_limits(self.plan)
+
+    def has_feature(self, feature_name):
+        """Check if the user's plan has a specific feature."""
+        from .plan_limits import has_feature
+
+        return has_feature(self.plan, feature_name)
+
+    def can_add_user_to_company(self):
+        """Check if the user's company can add more users based on plan limits."""
+        if not self.company:
+            return True
+
+        from .plan_limits import can_add_user
+
+        current_user_count = self.company.users.filter(is_active=True).count()
+        return can_add_user(self.plan, current_user_count)
+
+    def can_add_integration(self, current_integration_count=0):
+        """Check if the user can add more integrations based on plan limits."""
+        from .plan_limits import can_add_integration
+
+        return can_add_integration(self.plan, current_integration_count)
 
 
 class UserSession(RetryableModelMixin, models.Model):
