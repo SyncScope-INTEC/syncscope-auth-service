@@ -100,3 +100,42 @@ def extract_domain_from_email(email):
     if "@" not in email:
         return None
     return f"@{email.split('@')[1]}"
+
+
+def generate_reset_code():
+    """Generate a secure 6-digit reset code"""
+    import random
+
+    return "".join([str(random.randint(0, 9)) for _ in range(6)])
+
+
+def send_reset_email(user_email, user_name, reset_code):
+    """
+    Send password reset email via alerts-service
+    Returns True if email was sent successfully, False otherwise
+    """
+    import requests
+
+    alerts_service_url = settings.ALERTS_SERVICE_URL
+    frontend_url = settings.FRONTEND_URL
+
+    # Prepare the payload
+    payload = {
+        "user_email": user_email,
+        "user_name": user_name,
+        "reset_code": reset_code,
+        "frontend_url": frontend_url,
+    }
+
+    try:
+        # Call alerts-service API
+        response = requests.post(
+            f"{alerts_service_url}/alerts/send-password-reset-email/",
+            json=payload,
+            timeout=10,
+        )
+        return response.status_code == 200
+    except Exception as e:
+        # Log error but don't expose to user
+        print(f"Error sending reset email: {str(e)}")
+        return False

@@ -5,15 +5,18 @@ from .oauth import github_oauth_callback, github_oauth_initiate, github_oauth_st
 from .views import (
     ChangePasswordView,
     CustomTokenRefreshView,
+    ForgotPasswordView,
     LoginView,
     LogoutView,
     ProfileView,
     RegisterView,
+    ResetPasswordView,
     SupervisedUserDetailView,
     SupervisedUserListCreateView,
     UserByIdView,
     UserImageView,
     UserSessionsView,
+    VerifyResetCodeView,
     api_home,
     verify_token,
 )
@@ -30,6 +33,10 @@ urlpatterns = [
     path("profile/", ProfileView.as_view(), name="profile"),
     path("users/<uuid:user_id>/", UserByIdView.as_view(), name="user_by_id"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
+    # Password reset
+    path("forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
+    path("verify-reset-code/", VerifyResetCodeView.as_view(), name="verify_reset_code"),
+    path("reset-password/", ResetPasswordView.as_view(), name="reset_password"),
     # User images
     path("users/<uuid:user_id>/image/", UserImageView.as_view(), name="user_image"),
     # Session management

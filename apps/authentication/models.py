@@ -237,3 +237,82 @@ class SupervisedUser(RetryableModelMixin, models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class PasswordResetToken(RetryableModelMixin, models.Model):
+    """
+    Model for tracking password reset requests
+    Stores 6-digit codes with expiration and attempt tracking
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_tokens", db_column="user_id")
+    code_hash = models.CharField(max_length=255, help_text="SHA256 hash of the 6-digit reset code")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(help_text="Token expires after 1 hour")
+    attempts = models.IntegerField(default=0, help_text="Number of verification attempts")
+    is_used = models.BooleanField(default=False, help_text="Whether the token has been used successfully")
+    is_invalidated = models.BooleanField(default=False, help_text="Whether the token was invalidated (max attempts)")
+
+    objects = RetryableManager()
+
+    class Meta:
+        db_table = "password_reset_tokens"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["code_hash"]),
+            models.Index(fields=["expires_at"]),
+        ]
+
+    def __str__(self):
+        return f"Password reset for {self.user.email} - {self.created_at}"
+
+    @atomic_with_retry()
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            # 1 hour expiration as per requirements
+            self.expires_at = timezone.now() + timedelta(hours=1)
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        """Check if the reset token has expired"""
+        return timezone.now() > self.expires_at
+
+    def is_valid(self):
+        """Check if the token is valid (not expired, not used, not invalidated, attempts < 5)"""
+        return (
+            not self.is_expired()
+            and not self.is_used
+            and not self.is_invalidated
+            and self.attempts < 5
+        )
+
+    @atomic_with_retry()
+    def increment_attempts(self):
+        """Increment attempt count and invalidate if max attempts reached"""
+        self.attempts += 1
+        if self.attempts >= 5:
+            self.is_invalidated = True
+        self.save()
+
+    @atomic_with_retry()
+    def mark_as_used(self):
+        """Mark the token as successfully used"""
+        self.is_used = True
+        self.save()
+
+    @classmethod
+    @atomic_with_retry()
+    def cleanup_expired_tokens(cls):
+        """Delete expired or used reset tokens"""
+        cutoff_time = timezone.now() - timedelta(days=1)
+        cls.objects.filter(
+            models.Q(expires_at__lt=timezone.now()) | models.Q(is_used=True, created_at__lt=cutoff_time)
+        ).delete()
+
+    @classmethod
+    @atomic_with_retry()
+    def invalidate_user_tokens(cls, user):
+        """Invalidate all reset tokens for a user"""
+        cls.objects.filter(user=user, is_used=False, is_invalidated=False).update(is_invalidated=True)

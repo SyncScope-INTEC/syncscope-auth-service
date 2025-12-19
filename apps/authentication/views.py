@@ -21,14 +21,18 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from config.database_retry import atomic_with_retry
 
 from .db_mixins import ServerlessViewMixin
-from .models import SupervisedUser, User, UserSession
+from .models import PasswordResetToken, SupervisedUser, User, UserSession
 from .serializers import (
     AuthResponseSerializer,
     ErrorResponseSerializer,
+    ForgotPasswordResponseSerializer,
+    ForgotPasswordSerializer,
     LogoutResponseSerializer,
     LogoutSerializer,
     PasswordChangeResponseSerializer,
     PasswordChangeSerializer,
+    ResetPasswordResponseSerializer,
+    ResetPasswordSerializer,
     SessionTerminationResponseSerializer,
     SessionTerminationSerializer,
     SupervisedUserCreateSerializer,
@@ -42,8 +46,19 @@ from .serializers import (
     UserRegistrationSerializer,
     UserSessionSerializer,
     UserUpdateSerializer,
+    VerifyResetCodeResponseSerializer,
+    VerifyResetCodeSerializer,
 )
-from .utils import create_user_session, get_client_ip, get_tokens_for_user, invalidate_user_sessions, validate_session_token
+from .utils import (
+    create_user_session,
+    generate_reset_code,
+    get_client_ip,
+    get_tokens_for_user,
+    hash_token,
+    invalidate_user_sessions,
+    send_reset_email,
+    validate_session_token,
+)
 
 
 @extend_schema_view(
@@ -784,3 +799,211 @@ class UserImageView(ServerlessViewMixin, APIView):
             )
         except Exception as e:
             raise Http404("Could not retrieve profile image")
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Password Reset"],
+        summary="Request password reset code",
+        description="Request a 6-digit password reset code to be sent via email. Rate limited to 3 requests per hour.",
+        request=ForgotPasswordSerializer,
+        responses={
+            200: ForgotPasswordResponseSerializer,
+            400: ErrorResponseSerializer,
+            429: ErrorResponseSerializer,
+        },
+    )
+)
+@method_decorator(ratelimit(key="ip", rate="3/h", method="POST"), name="post")
+class ForgotPasswordView(ServerlessViewMixin, APIView):
+    """Request password reset code"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(email=email, is_active=True)
+
+            # Invalidate any existing reset tokens for this user
+            PasswordResetToken.invalidate_user_tokens(user)
+
+            # Generate new 6-digit code
+            reset_code = generate_reset_code()
+            code_hash = hash_token(reset_code)
+
+            # Create reset token
+            PasswordResetToken.objects.create(user=user, code_hash=code_hash)
+
+            # Send email via alerts service
+            user_name = user.full_name or user.email
+            email_sent = send_reset_email(user.email, user_name, reset_code)
+
+            if not email_sent:
+                return Response(
+                    {"error": "Failed to send reset email. Please try again later."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        except User.DoesNotExist:
+            # Don't reveal that user doesn't exist for security
+            pass
+
+        # Always return success to prevent user enumeration
+        return Response(
+            {
+                "message": "If an account with that email exists, a password reset code has been sent. The code will expire in 1 hour."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Password Reset"],
+        summary="Verify password reset code",
+        description="Verify that a 6-digit reset code is valid before attempting password reset. Maximum 5 attempts allowed.",
+        request=VerifyResetCodeSerializer,
+        responses={
+            200: VerifyResetCodeResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+)
+class VerifyResetCodeView(ServerlessViewMixin, APIView):
+    """Verify password reset code without resetting password"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = VerifyResetCodeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+        code_hash = hash_token(code)
+
+        try:
+            user = User.objects.get(email=email, is_active=True)
+
+            # Get the most recent valid token
+            reset_token = (
+                PasswordResetToken.objects.filter(user=user, code_hash=code_hash, is_used=False, is_invalidated=False)
+                .order_by("-created_at")
+                .first()
+            )
+
+            if not reset_token:
+                return Response(
+                    {"valid": False, "message": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if token is valid
+            if not reset_token.is_valid():
+                if reset_token.is_expired():
+                    return Response(
+                        {"valid": False, "message": "Reset code has expired. Please request a new one."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                elif reset_token.attempts >= 5:
+                    return Response(
+                        {
+                            "valid": False,
+                            "message": "Maximum verification attempts exceeded. Please request a new reset code.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                else:
+                    return Response(
+                        {"valid": False, "message": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            return Response({"valid": True, "message": "Reset code is valid"}, status=status.HTTP_200_OK)
+
+        except User.DoesNotExist:
+            return Response({"valid": False, "message": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Password Reset"],
+        summary="Reset password with code",
+        description="Reset password using the 6-digit code received via email. All active sessions will be terminated.",
+        request=ResetPasswordSerializer,
+        responses={
+            200: ResetPasswordResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+)
+class ResetPasswordView(ServerlessViewMixin, APIView):
+    """Reset password using verification code"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+        new_password = serializer.validated_data["new_password"]
+        code_hash = hash_token(code)
+
+        try:
+            user = User.objects.get(email=email, is_active=True)
+
+            # Get the most recent valid token
+            reset_token = (
+                PasswordResetToken.objects.filter(user=user, code_hash=code_hash, is_used=False, is_invalidated=False)
+                .order_by("-created_at")
+                .first()
+            )
+
+            if not reset_token:
+                return Response({"error": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Increment attempts
+            reset_token.increment_attempts()
+
+            # Check if token is still valid after incrementing
+            if not reset_token.is_valid():
+                if reset_token.is_expired():
+                    return Response(
+                        {"error": "Reset code has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST
+                    )
+                elif reset_token.is_invalidated:
+                    return Response(
+                        {"error": "Maximum attempts exceeded. Please request a new reset code."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                else:
+                    return Response({"error": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Reset password
+            user.set_password(new_password)
+            user.save(update_fields=["password"])
+
+            # Mark token as used
+            reset_token.mark_as_used()
+
+            # Invalidate all active sessions (log out all devices)
+            invalidate_user_sessions(user)
+
+            return Response(
+                {"message": "Password has been reset successfully. Please log in with your new password."},
+                status=status.HTTP_200_OK,
+            )
+
+        except User.DoesNotExist:
+            return Response({"error": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)

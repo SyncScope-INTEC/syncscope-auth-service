@@ -363,3 +363,86 @@ class PlanLimitsSerializer(serializers.Serializer):
     max_integrations = serializers.IntegerField(allow_null=True, help_text="Maximum integrations allowed (null = unlimited)")
     features = serializers.ListField(child=serializers.CharField())
     description = serializers.CharField()
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """Serializer for forgot password request"""
+
+    email = serializers.EmailField(required=True, help_text="Email address of the account to reset password for")
+
+    def validate_email(self, value):
+        """Validate that the email exists in the system"""
+        email = value.lower()
+        try:
+            User.objects.get(email=email, is_active=True)
+        except User.DoesNotExist:
+            # Don't reveal whether the email exists for security reasons
+            # Return the same response whether user exists or not
+            pass
+        return email
+
+
+class VerifyResetCodeSerializer(serializers.Serializer):
+    """Serializer for verifying password reset code"""
+
+    email = serializers.EmailField(required=True, help_text="Email address of the account")
+    code = serializers.CharField(
+        required=True, min_length=6, max_length=6, help_text="6-digit reset code from email"
+    )
+
+    def validate_code(self, value):
+        """Validate code is 6 digits"""
+        if not value.isdigit():
+            raise serializers.ValidationError("Reset code must be 6 digits")
+        return value
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """Serializer for resetting password with code"""
+
+    email = serializers.EmailField(required=True, help_text="Email address of the account")
+    code = serializers.CharField(
+        required=True, min_length=6, max_length=6, help_text="6-digit reset code from email"
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        help_text="New password (must be at least 8 characters long)",
+        style={"input_type": "password"},
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True,
+        help_text="Confirm new password",
+        style={"input_type": "password"},
+    )
+
+    def validate_code(self, value):
+        """Validate code is 6 digits"""
+        if not value.isdigit():
+            raise serializers.ValidationError("Reset code must be 6 digits")
+        return value
+
+    def validate(self, attrs):
+        """Validate passwords match"""
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError({"new_password_confirm": "Passwords don't match"})
+        return attrs
+
+
+class ForgotPasswordResponseSerializer(serializers.Serializer):
+    """Response serializer for forgot password endpoint"""
+
+    message = serializers.CharField()
+
+
+class VerifyResetCodeResponseSerializer(serializers.Serializer):
+    """Response serializer for verify reset code endpoint"""
+
+    valid = serializers.BooleanField()
+    message = serializers.CharField()
+
+
+class ResetPasswordResponseSerializer(serializers.Serializer):
+    """Response serializer for reset password endpoint"""
+
+    message = serializers.CharField()
