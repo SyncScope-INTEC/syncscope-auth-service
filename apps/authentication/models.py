@@ -281,12 +281,7 @@ class PasswordResetToken(RetryableModelMixin, models.Model):
 
     def is_valid(self):
         """Check if the token is valid (not expired, not used, not invalidated, attempts < 5)"""
-        return (
-            not self.is_expired()
-            and not self.is_used
-            and not self.is_invalidated
-            and self.attempts < 5
-        )
+        return not self.is_expired() and not self.is_used and not self.is_invalidated and self.attempts < 5
 
     @atomic_with_retry()
     def increment_attempts(self):

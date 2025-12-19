@@ -386,9 +386,7 @@ class VerifyResetCodeSerializer(serializers.Serializer):
     """Serializer for verifying password reset code"""
 
     email = serializers.EmailField(required=True, help_text="Email address of the account")
-    code = serializers.CharField(
-        required=True, min_length=6, max_length=6, help_text="6-digit reset code from email"
-    )
+    code = serializers.CharField(required=True, min_length=6, max_length=6, help_text="6-digit reset code from email")
 
     def validate_code(self, value):
         """Validate code is 6 digits"""
@@ -401,9 +399,7 @@ class ResetPasswordSerializer(serializers.Serializer):
     """Serializer for resetting password with code"""
 
     email = serializers.EmailField(required=True, help_text="Email address of the account")
-    code = serializers.CharField(
-        required=True, min_length=6, max_length=6, help_text="6-digit reset code from email"
-    )
+    code = serializers.CharField(required=True, min_length=6, max_length=6, help_text="6-digit reset code from email")
     new_password = serializers.CharField(
         write_only=True,
         validators=[validate_password],
