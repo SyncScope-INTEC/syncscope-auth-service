@@ -530,7 +530,7 @@ class TestPasswordResetAPI:
             mock_send_called.append({"email": email, "name": name, "code": code})
             return True
 
-        monkeypatch.setattr(utils, "send_reset_email", mock_send_reset_email)
+        monkeypatch.setattr("apps.authentication.views.send_reset_email", mock_send_reset_email)
 
         url = reverse("forgot_password")
         data = {"email": user.email}
@@ -562,7 +562,7 @@ class TestPasswordResetAPI:
             mock_send_called.append(True)
             return True
 
-        monkeypatch.setattr(utils, "send_reset_email", mock_send_reset_email)
+        monkeypatch.setattr("apps.authentication.views.send_reset_email", mock_send_reset_email)
 
         url = reverse("forgot_password")
         data = {"email": "nonexistent@testcompany.com"}
@@ -588,7 +588,7 @@ class TestPasswordResetAPI:
             mock_send_called.append(True)
             return True
 
-        monkeypatch.setattr(utils, "send_reset_email", mock_send_reset_email)
+        monkeypatch.setattr("apps.authentication.views.send_reset_email", mock_send_reset_email)
 
         url = reverse("forgot_password")
         data = {"email": user.email}
@@ -615,7 +615,7 @@ class TestPasswordResetAPI:
         def mock_send_reset_email(email, name, code):
             return True
 
-        monkeypatch.setattr(utils, "send_reset_email", mock_send_reset_email)
+        monkeypatch.setattr("apps.authentication.views.send_reset_email", mock_send_reset_email)
 
         url = reverse("forgot_password")
         data = {"email": user.email}
@@ -969,7 +969,7 @@ class TestPasswordResetAPI:
         def mock_send_reset_email_failure(email, name, code):
             return False
 
-        monkeypatch.setattr(utils, "send_reset_email", mock_send_reset_email_failure)
+        monkeypatch.setattr("apps.authentication.views.send_reset_email", mock_send_reset_email_failure)
 
         url = reverse("forgot_password")
         data = {"email": user.email}
