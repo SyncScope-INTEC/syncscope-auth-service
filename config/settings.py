@@ -408,3 +408,7 @@ SPECTACULAR_SETTINGS = {
         "apps.authentication.views.api_home",
     ],
 }
+
+# Service URLs for inter-service communication
+ALERTS_SERVICE_URL = config("ALERTS_SERVICE_URL", default="http://localhost:8004")
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
