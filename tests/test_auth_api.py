@@ -669,9 +669,10 @@ class TestPasswordResetAPI:
         """Test verification with expired reset code"""
         from datetime import timedelta
 
+        from django.utils import timezone
+
         from apps.authentication.models import PasswordResetToken
         from apps.authentication.utils import hash_token
-        from django.utils import timezone
 
         # Create an expired reset token
         reset_code = "123456"
@@ -819,9 +820,10 @@ class TestPasswordResetAPI:
         """Test password reset with expired token"""
         from datetime import timedelta
 
+        from django.utils import timezone
+
         from apps.authentication.models import PasswordResetToken
         from apps.authentication.utils import hash_token
-        from django.utils import timezone
 
         # Create an expired reset token
         reset_code = "123456"
@@ -1008,9 +1010,10 @@ class TestPasswordResetAPI:
         """Test cleanup of expired password reset tokens"""
         from datetime import timedelta
 
+        from django.utils import timezone
+
         from apps.authentication.models import PasswordResetToken
         from apps.authentication.utils import hash_token
-        from django.utils import timezone
 
         # Create expired tokens
         for i in range(3):
@@ -1036,9 +1039,10 @@ class TestPasswordResetAPI:
         """Test PasswordResetToken.is_expired() method"""
         from datetime import timedelta
 
+        from django.utils import timezone
+
         from apps.authentication.models import PasswordResetToken
         from apps.authentication.utils import hash_token
-        from django.utils import timezone
 
         # Create valid token
         code_hash = hash_token("validcode")
