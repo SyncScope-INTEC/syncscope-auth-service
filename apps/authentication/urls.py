@@ -3,6 +3,7 @@ from django.urls import path
 from .health import health_check, liveness_check, readiness_check
 from .oauth import github_oauth_callback, github_oauth_initiate, github_oauth_status, github_oauth_url
 from .views import (
+    ChangeInitialPasswordView,
     ChangePasswordView,
     CustomTokenRefreshView,
     ForgotPasswordView,
@@ -11,6 +12,7 @@ from .views import (
     ProfileView,
     RegisterView,
     ResetPasswordView,
+    SetupAccountView,
     SupervisedUserDetailView,
     SupervisedUserListCreateView,
     UserByIdView,
@@ -37,6 +39,9 @@ urlpatterns = [
     path("forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
     path("verify-reset-code/", VerifyResetCodeView.as_view(), name="verify_reset_code"),
     path("reset-password/", ResetPasswordView.as_view(), name="reset_password"),
+    # Account setup (Stripe integration)
+    path("setup-account/", SetupAccountView.as_view(), name="setup_account"),
+    path("change-initial-password/", ChangeInitialPasswordView.as_view(), name="change_initial_password"),
     # User images
     path("users/<uuid:user_id>/image/", UserImageView.as_view(), name="user_image"),
     # Session management

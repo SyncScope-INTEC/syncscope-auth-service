@@ -24,6 +24,8 @@ from .db_mixins import ServerlessViewMixin
 from .models import PasswordResetToken, SupervisedUser, User, UserSession
 from .serializers import (
     AuthResponseSerializer,
+    ChangeInitialPasswordResponseSerializer,
+    ChangeInitialPasswordSerializer,
     ErrorResponseSerializer,
     ForgotPasswordResponseSerializer,
     ForgotPasswordSerializer,
@@ -35,6 +37,8 @@ from .serializers import (
     ResetPasswordSerializer,
     SessionTerminationResponseSerializer,
     SessionTerminationSerializer,
+    SetupAccountResponseSerializer,
+    SetupAccountSerializer,
     SupervisedUserCreateSerializer,
     SupervisedUserSerializer,
     TokenRefreshRequestSerializer,
@@ -52,11 +56,13 @@ from .serializers import (
 from .utils import (
     create_user_session,
     generate_reset_code,
+    generate_temp_password,
     get_client_ip,
     get_tokens_for_user,
     hash_token,
     invalidate_user_sessions,
     send_reset_email,
+    send_welcome_email,
     validate_session_token,
 )
 
@@ -126,15 +132,19 @@ class LoginView(ServerlessViewMixin, APIView):
             user.last_login = timezone.now()
             user.save(update_fields=["last_login"])
 
-            return Response(
-                {
-                    "message": "Login successful",
-                    "user": UserProfileSerializer(user).data,
-                    "tokens": tokens,
-                    "session_token": token,
-                },
-                status=status.HTTP_200_OK,
-            )
+            # Check if user needs to change their password (temporary password from Stripe setup)
+            response_data = {
+                "message": "Login successful",
+                "user": UserProfileSerializer(user).data,
+                "tokens": tokens,
+                "session_token": token,
+            }
+
+            if user.requires_password_change:
+                response_data["requires_password_change"] = True
+                response_data["message"] = "Login successful. You must change your temporary password before continuing."
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1007,3 +1017,135 @@ class ResetPasswordView(ServerlessViewMixin, APIView):
 
         except User.DoesNotExist:
             return Response({"error": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Account Setup"],
+        summary="Setup account after Stripe payment",
+        description="Create or update user account with temporary password after Stripe payment. Sends welcome email with credentials. Public endpoint - no authentication required.",
+        request=SetupAccountSerializer,
+        responses={
+            200: SetupAccountResponseSerializer,
+            201: SetupAccountResponseSerializer,
+            400: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
+)
+@method_decorator(ratelimit(key="ip", rate="5/m", method="POST"), name="post")
+class SetupAccountView(ServerlessViewMixin, APIView):
+    """Setup account after Stripe payment with temporary password"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = SetupAccountSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        first_name = serializer.validated_data.get("first_name", "")
+        last_name = serializer.validated_data.get("last_name", "")
+        plan = serializer.validated_data.get("plan", "starter")
+
+        # Generate temporary password
+        temp_password = generate_temp_password()
+
+        # Check if user already exists
+        try:
+            user = User.objects.get(email=email)
+            user_created = False
+
+            # Update existing user with new temporary password
+            user.set_password(temp_password)
+            user.requires_password_change = True
+
+            # Update name and plan if provided
+            if first_name:
+                user.first_name = first_name
+            if last_name:
+                user.last_name = last_name
+            user.plan = plan
+
+            user.save()
+
+        except User.DoesNotExist:
+            # Create new user
+            user_created = True
+            user = User.objects.create_user(
+                email=email,
+                password=temp_password,
+                first_name=first_name or "User",
+                last_name=last_name or "",
+                plan=plan,
+                requires_password_change=True,
+            )
+
+        # Send welcome email with temporary password
+        user_name = user.full_name or user.email
+        email_sent = send_welcome_email(user.email, user_name, temp_password, plan)
+
+        if not email_sent:
+            return Response(
+                {"error": "Account created but failed to send welcome email. Please contact support."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        status_code = status.HTTP_201_CREATED if user_created else status.HTTP_200_OK
+        message = "Account created successfully" if user_created else "Account updated successfully"
+
+        return Response(
+            {
+                "message": f"{message}. Welcome email sent with temporary password.",
+                "email": user.email,
+                "user_id": str(user.id),
+                "user_created": user_created,
+            },
+            status=status_code,
+        )
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Account Setup"],
+        summary="Change initial temporary password",
+        description="Change temporary password received via email to a new permanent password. Requires authentication with temporary password. Returns new JWT tokens.",
+        request=ChangeInitialPasswordSerializer,
+        responses={
+            200: ChangeInitialPasswordResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    )
+)
+class ChangeInitialPasswordView(ServerlessViewMixin, APIView):
+    """Change initial temporary password to permanent password"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = ChangeInitialPasswordSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        new_password = serializer.validated_data["new_password"]
+
+        # Set new password and clear the requires_password_change flag
+        user.set_password(new_password)
+        user.requires_password_change = False
+        user.save(update_fields=["password", "requires_password_change"])
+
+        # Invalidate all existing sessions (force re-login everywhere)
+        invalidate_user_sessions(user)
+
+        # Generate new tokens for this session
+        tokens = get_tokens_for_user(user)
+
+        return Response(
+            {"message": "Password changed successfully. Please use your new password for future logins.", "tokens": tokens},
+            status=status.HTTP_200_OK,
+        )

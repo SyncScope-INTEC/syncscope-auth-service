@@ -60,3 +60,6 @@ SESSION_COOKIE_SECURE = False
 
 # Set a simple secret key for testing
 SECRET_KEY = "test-secret-key-for-testing-only"
+
+# Disable rate limiting for tests
+RATELIMIT_ENABLE = False

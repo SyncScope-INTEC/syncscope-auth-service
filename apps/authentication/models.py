@@ -71,6 +71,10 @@ class User(RetryableModelMixin, AbstractUser):
     profile_image_path = models.CharField(
         max_length=500, null=True, blank=True, help_text="Path to user profile image stored in Railway volume"
     )
+    requires_password_change = models.BooleanField(
+        default=False,
+        help_text="Flag indicating user must change their password on next login (e.g., temporary password from Stripe setup)",
+    )
     # Remove fields that aren't in the new schema
     # is_verified = models.BooleanField(default=False)
     # github_id = models.CharField(max_length=50, null=True, blank=True, unique=True)

@@ -139,3 +139,69 @@ def send_reset_email(user_email, user_name, reset_code):
         # Log error but don't expose to user
         print(f"Error sending reset email: {str(e)}")
         return False
+
+
+def generate_temp_password():
+    """
+    Generate a secure 12-character temporary password
+    Format: Uppercase + lowercase + digits + 1 special char
+    Example: Abc123!def45
+    """
+    import random
+    import string
+
+    # Define character sets
+    uppercase = string.ascii_uppercase
+    lowercase = string.ascii_lowercase
+    digits = string.digits
+    special = "!@#$%"
+
+    # Ensure at least one of each type
+    password = [
+        random.choice(uppercase),
+        random.choice(lowercase),
+        random.choice(digits),
+        random.choice(special),
+    ]
+
+    # Fill remaining 8 characters with mix of all types
+    all_chars = uppercase + lowercase + digits + special
+    password.extend(random.choice(all_chars) for _ in range(8))
+
+    # Shuffle to avoid predictable pattern
+    random.shuffle(password)
+
+    return "".join(password)
+
+
+def send_welcome_email(user_email, user_name, temp_password, plan="starter"):
+    """
+    Send welcome email with temporary password via alerts-service
+    Returns True if email was sent successfully, False otherwise
+    """
+    import requests
+
+    alerts_service_url = settings.ALERTS_SERVICE_URL
+    frontend_url = settings.FRONTEND_URL
+
+    # Prepare the payload
+    payload = {
+        "user_email": user_email,
+        "user_name": user_name,
+        "temp_password": temp_password,
+        "plan": plan,
+        "frontend_url": frontend_url,
+    }
+
+    try:
+        # Call alerts-service API
+        response = requests.post(
+            f"{alerts_service_url}/alerts/send-welcome-email/",
+            json=payload,
+            timeout=10,
+        )
+        return response.status_code == 200
+    except Exception as e:
+        # Log error but don't expose to user
+        print(f"Error sending welcome email: {str(e)}")
+        return False

@@ -442,3 +442,65 @@ class ResetPasswordResponseSerializer(serializers.Serializer):
     """Response serializer for reset password endpoint"""
 
     message = serializers.CharField()
+
+
+class SetupAccountSerializer(serializers.Serializer):
+    """Serializer for setting up account after Stripe payment"""
+
+    email = serializers.EmailField(required=True, help_text="User's email address (required)")
+    first_name = serializers.CharField(required=False, allow_blank=True, help_text="User's first name (optional)")
+    last_name = serializers.CharField(required=False, allow_blank=True, help_text="User's last name (optional)")
+    plan = serializers.ChoiceField(
+        choices=["starter", "growth", "enterprise"],
+        default="starter",
+        help_text="User's subscription plan (default: starter)",
+    )
+
+    def validate_email(self, value):
+        """Normalize email to lowercase"""
+        return value.lower()
+
+
+class SetupAccountResponseSerializer(serializers.Serializer):
+    """Response serializer for setup account endpoint"""
+
+    message = serializers.CharField()
+    email = serializers.EmailField()
+    user_id = serializers.UUIDField()
+    user_created = serializers.BooleanField(help_text="True if new user was created, False if existing user was updated")
+
+
+class ChangeInitialPasswordSerializer(serializers.Serializer):
+    """Serializer for changing initial temporary password"""
+
+    temp_password = serializers.CharField(
+        write_only=True, required=True, help_text="Current temporary password", style={"input_type": "password"}
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        help_text="New password (must be at least 8 characters long)",
+        style={"input_type": "password"},
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True, help_text="Confirm new password", style={"input_type": "password"}
+    )
+
+    def validate(self, attrs):
+        """Validate passwords match"""
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError({"new_password_confirm": "Passwords don't match"})
+
+        # Validate temp password is correct
+        user = self.context["request"].user
+        if not user.check_password(attrs["temp_password"]):
+            raise serializers.ValidationError({"temp_password": "Temporary password is incorrect"})
+
+        return attrs
+
+
+class ChangeInitialPasswordResponseSerializer(serializers.Serializer):
+    """Response serializer for change initial password endpoint"""
+
+    message = serializers.CharField()
+    tokens = serializers.DictField(child=serializers.CharField(), help_text="New JWT tokens after password change")
