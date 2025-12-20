@@ -27,18 +27,13 @@ def api_client():
 class TestSetupAccountEndpoint:
     """Tests for POST /auth/setup-account/ endpoint"""
 
-    @patch('apps.authentication.views.send_welcome_email')
+    @patch("apps.authentication.views.send_welcome_email")
     def test_setup_account_creates_new_user(self, mock_send_email, api_client):
         """Test that setup-account creates a new user with temporary password"""
         mock_send_email.return_value = True
 
         url = reverse("setup_account")
-        data = {
-            "email": "newuser@example.com",
-            "first_name": "John",
-            "last_name": "Doe",
-            "plan": "growth"
-        }
+        data = {"email": "newuser@example.com", "first_name": "John", "last_name": "Doe", "plan": "growth"}
 
         response = api_client.post(url, data)
 
@@ -63,28 +58,19 @@ class TestSetupAccountEndpoint:
         assert len(call_args[2]) == 12  # temp_password (12 chars)
         assert call_args[3] == "growth"  # plan
 
-    @patch('apps.authentication.views.send_welcome_email')
+    @patch("apps.authentication.views.send_welcome_email")
     def test_setup_account_updates_existing_user(self, mock_send_email, api_client):
         """Test that setup-account updates existing user's password"""
         mock_send_email.return_value = True
 
         # Create existing user
         existing_user = User.objects.create_user(
-            email="existing@example.com",
-            password="oldpassword123",
-            first_name="Jane",
-            last_name="Smith",
-            plan="starter"
+            email="existing@example.com", password="oldpassword123", first_name="Jane", last_name="Smith", plan="starter"
         )
         old_password_hash = existing_user.password
 
         url = reverse("setup_account")
-        data = {
-            "email": "existing@example.com",
-            "first_name": "Jane",
-            "last_name": "Updated",
-            "plan": "enterprise"
-        }
+        data = {"email": "existing@example.com", "first_name": "Jane", "last_name": "Updated", "plan": "enterprise"}
 
         response = api_client.post(url, data)
 
@@ -103,15 +89,13 @@ class TestSetupAccountEndpoint:
         # Verify welcome email was sent
         mock_send_email.assert_called_once()
 
-    @patch('apps.authentication.views.send_welcome_email')
+    @patch("apps.authentication.views.send_welcome_email")
     def test_setup_account_email_only_required(self, mock_send_email, api_client):
         """Test that only email is required for setup-account"""
         mock_send_email.return_value = True
 
         url = reverse("setup_account")
-        data = {
-            "email": "minimal@example.com"
-        }
+        data = {"email": "minimal@example.com"}
 
         response = api_client.post(url, data)
 
@@ -127,39 +111,33 @@ class TestSetupAccountEndpoint:
     def test_setup_account_missing_email(self, api_client):
         """Test that setup-account returns error when email is missing"""
         url = reverse("setup_account")
-        data = {
-            "first_name": "John"
-        }
+        data = {"first_name": "John"}
 
         response = api_client.post(url, data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "email" in response.data
 
-    @patch('apps.authentication.views.send_welcome_email')
+    @patch("apps.authentication.views.send_welcome_email")
     def test_setup_account_email_send_failure(self, mock_send_email, api_client):
         """Test that setup-account returns error when email fails to send"""
         mock_send_email.return_value = False
 
         url = reverse("setup_account")
-        data = {
-            "email": "test@example.com"
-        }
+        data = {"email": "test@example.com"}
 
         response = api_client.post(url, data)
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "failed to send welcome email" in response.data["error"].lower()
 
-    @patch('apps.authentication.views.send_welcome_email')
+    @patch("apps.authentication.views.send_welcome_email")
     def test_setup_account_normalizes_email_to_lowercase(self, mock_send_email, api_client):
         """Test that email is normalized to lowercase"""
         mock_send_email.return_value = True
 
         url = reverse("setup_account")
-        data = {
-            "email": "TestUser@EXAMPLE.COM"
-        }
+        data = {"email": "TestUser@EXAMPLE.COM"}
 
         response = api_client.post(url, data)
 
@@ -182,14 +160,11 @@ class TestLoginWithPasswordChangeRequired:
             password="TempPass123!",
             first_name="Temp",
             last_name="User",
-            requires_password_change=True
+            requires_password_change=True,
         )
 
         url = reverse("login")
-        data = {
-            "email": "temppass@example.com",
-            "password": "TempPass123!"
-        }
+        data = {"email": "temppass@example.com", "password": "TempPass123!"}
 
         response = api_client.post(url, data)
 
@@ -207,14 +182,11 @@ class TestLoginWithPasswordChangeRequired:
             password="NormalPass123!",
             first_name="Normal",
             last_name="User",
-            requires_password_change=False
+            requires_password_change=False,
         )
 
         url = reverse("login")
-        data = {
-            "email": "normal@example.com",
-            "password": "NormalPass123!"
-        }
+        data = {"email": "normal@example.com", "password": "NormalPass123!"}
 
         response = api_client.post(url, data)
 
@@ -235,15 +207,12 @@ class TestChangeInitialPasswordEndpoint:
             password="TempPass123!",
             first_name="Temp",
             last_name="User",
-            requires_password_change=True
+            requires_password_change=True,
         )
 
         # Login to get auth token
         login_url = reverse("login")
-        login_data = {
-            "email": "temp@example.com",
-            "password": "TempPass123!"
-        }
+        login_data = {"email": "temp@example.com", "password": "TempPass123!"}
         login_response = api_client.post(login_url, login_data)
         access_token = login_response.data["tokens"]["access"]
 
@@ -252,10 +221,10 @@ class TestChangeInitialPasswordEndpoint:
         data = {
             "temp_password": "TempPass123!",
             "new_password": "NewSecurePass123!",
-            "new_password_confirm": "NewSecurePass123!"
+            "new_password_confirm": "NewSecurePass123!",
         }
 
-        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
         response = api_client.post(url, data)
 
         assert response.status_code == status.HTTP_200_OK
@@ -270,18 +239,11 @@ class TestChangeInitialPasswordEndpoint:
 
     def test_change_initial_password_wrong_temp_password(self, api_client):
         """Test that wrong temporary password is rejected"""
-        user = User.objects.create_user(
-            email="temp@example.com",
-            password="TempPass123!",
-            requires_password_change=True
-        )
+        user = User.objects.create_user(email="temp@example.com", password="TempPass123!", requires_password_change=True)
 
         # Login
         login_url = reverse("login")
-        login_response = api_client.post(login_url, {
-            "email": "temp@example.com",
-            "password": "TempPass123!"
-        })
+        login_response = api_client.post(login_url, {"email": "temp@example.com", "password": "TempPass123!"})
         access_token = login_response.data["tokens"]["access"]
 
         # Try to change with wrong temp password
@@ -289,10 +251,10 @@ class TestChangeInitialPasswordEndpoint:
         data = {
             "temp_password": "WrongPassword!",
             "new_password": "NewSecurePass123!",
-            "new_password_confirm": "NewSecurePass123!"
+            "new_password_confirm": "NewSecurePass123!",
         }
 
-        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
         response = api_client.post(url, data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -300,18 +262,11 @@ class TestChangeInitialPasswordEndpoint:
 
     def test_change_initial_password_mismatch(self, api_client):
         """Test that password confirmation mismatch is rejected"""
-        user = User.objects.create_user(
-            email="temp@example.com",
-            password="TempPass123!",
-            requires_password_change=True
-        )
+        user = User.objects.create_user(email="temp@example.com", password="TempPass123!", requires_password_change=True)
 
         # Login
         login_url = reverse("login")
-        login_response = api_client.post(login_url, {
-            "email": "temp@example.com",
-            "password": "TempPass123!"
-        })
+        login_response = api_client.post(login_url, {"email": "temp@example.com", "password": "TempPass123!"})
         access_token = login_response.data["tokens"]["access"]
 
         # Try to change with mismatched passwords
@@ -319,10 +274,10 @@ class TestChangeInitialPasswordEndpoint:
         data = {
             "temp_password": "TempPass123!",
             "new_password": "NewSecurePass123!",
-            "new_password_confirm": "DifferentPass123!"
+            "new_password_confirm": "DifferentPass123!",
         }
 
-        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
         response = api_client.post(url, data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -330,29 +285,18 @@ class TestChangeInitialPasswordEndpoint:
 
     def test_change_initial_password_weak_password(self, api_client):
         """Test that weak new password is rejected"""
-        user = User.objects.create_user(
-            email="temp@example.com",
-            password="TempPass123!",
-            requires_password_change=True
-        )
+        user = User.objects.create_user(email="temp@example.com", password="TempPass123!", requires_password_change=True)
 
         # Login
         login_url = reverse("login")
-        login_response = api_client.post(login_url, {
-            "email": "temp@example.com",
-            "password": "TempPass123!"
-        })
+        login_response = api_client.post(login_url, {"email": "temp@example.com", "password": "TempPass123!"})
         access_token = login_response.data["tokens"]["access"]
 
         # Try to change to weak password
         url = reverse("change_initial_password")
-        data = {
-            "temp_password": "TempPass123!",
-            "new_password": "123",
-            "new_password_confirm": "123"
-        }
+        data = {"temp_password": "TempPass123!", "new_password": "123", "new_password_confirm": "123"}
 
-        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
         response = api_client.post(url, data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -363,7 +307,7 @@ class TestChangeInitialPasswordEndpoint:
         data = {
             "temp_password": "TempPass123!",
             "new_password": "NewSecurePass123!",
-            "new_password_confirm": "NewSecurePass123!"
+            "new_password_confirm": "NewSecurePass123!",
         }
 
         response = api_client.post(url, data)
@@ -405,7 +349,7 @@ class TestTempPasswordGeneration:
 class TestEndToEndAccountSetupFlow:
     """Integration tests for the complete account setup flow"""
 
-    @patch('apps.authentication.views.send_welcome_email')
+    @patch("apps.authentication.views.send_welcome_email")
     def test_complete_stripe_account_setup_flow(self, mock_send_email, api_client):
         """
         Test complete flow:
@@ -418,12 +362,7 @@ class TestEndToEndAccountSetupFlow:
 
         # Step 1: Setup account
         setup_url = reverse("setup_account")
-        setup_data = {
-            "email": "customer@example.com",
-            "first_name": "Stripe",
-            "last_name": "Customer",
-            "plan": "growth"
-        }
+        setup_data = {"email": "customer@example.com", "first_name": "Stripe", "last_name": "Customer", "plan": "growth"}
         setup_response = api_client.post(setup_url, setup_data)
 
         assert setup_response.status_code == status.HTTP_201_CREATED
@@ -433,10 +372,7 @@ class TestEndToEndAccountSetupFlow:
 
         # Step 2: Login with temp password
         login_url = reverse("login")
-        login_data = {
-            "email": "customer@example.com",
-            "password": temp_password
-        }
+        login_data = {"email": "customer@example.com", "password": temp_password}
         login_response = api_client.post(login_url, login_data)
 
         assert login_response.status_code == status.HTTP_200_OK
@@ -449,19 +385,16 @@ class TestEndToEndAccountSetupFlow:
         change_pwd_data = {
             "temp_password": temp_password,
             "new_password": "MyNewSecurePass123!",
-            "new_password_confirm": "MyNewSecurePass123!"
+            "new_password_confirm": "MyNewSecurePass123!",
         }
-        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
         change_response = api_client.post(change_pwd_url, change_pwd_data)
 
         assert change_response.status_code == status.HTTP_200_OK
 
         # Step 4: Login again with new password (should be normal login)
         api_client.credentials()  # Clear auth
-        login2_data = {
-            "email": "customer@example.com",
-            "password": "MyNewSecurePass123!"
-        }
+        login2_data = {"email": "customer@example.com", "password": "MyNewSecurePass123!"}
         login2_response = api_client.post(login_url, login2_data)
 
         assert login2_response.status_code == status.HTTP_200_OK
