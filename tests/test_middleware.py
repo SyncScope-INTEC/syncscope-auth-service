@@ -260,6 +260,7 @@ class TestRateLimitMiddleware:
         # Should return None for non-auth paths
         assert response is None
 
+    @override_settings(RATELIMIT_ENABLE=True)
     @patch("apps.authentication.middleware.cache")
     def test_rate_limit_exceeded(self, mock_cache):
         """Test that rate limit exceeded returns 429."""
@@ -279,6 +280,7 @@ class TestRateLimitMiddleware:
         assert response.status_code == 429
         assert "Rate limit exceeded" in response.content.decode()
 
+    @override_settings(RATELIMIT_ENABLE=True)
     @patch("apps.authentication.middleware.cache")
     def test_rate_limit_headers_added(self, mock_cache):
         """Test that rate limit headers are added to response."""
@@ -299,6 +301,7 @@ class TestRateLimitMiddleware:
         assert "X-RateLimit-Remaining" in response
         assert "X-RateLimit-Reset" in response
 
+    @override_settings(RATELIMIT_ENABLE=True)
     @patch("apps.authentication.middleware.cache")
     def test_different_limits_for_login_register(self, mock_cache):
         """Test different rate limits for login/register vs other auth endpoints."""
