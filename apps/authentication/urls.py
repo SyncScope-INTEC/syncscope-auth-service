@@ -3,8 +3,10 @@ from django.urls import path
 from .health import health_check, liveness_check, readiness_check
 from .oauth import github_oauth_callback, github_oauth_initiate, github_oauth_status, github_oauth_url
 from .views import (
+    AcceptInvitationView,
     ChangeInitialPasswordView,
     ChangePasswordView,
+    CompanyInvitationView,
     CustomTokenRefreshView,
     ForgotPasswordView,
     LoginView,
@@ -49,6 +51,9 @@ urlpatterns = [
     # Supervision management
     path("supervised-users/", SupervisedUserListCreateView.as_view(), name="supervised_users"),
     path("supervised-users/<uuid:pk>/", SupervisedUserDetailView.as_view(), name="supervised_user_detail"),
+    # Company invitation endpoints
+    path("invitations/", CompanyInvitationView.as_view(), name="company_invitations"),
+    path("invitations/accept/", AcceptInvitationView.as_view(), name="accept_invitation"),
     # OAuth endpoints
     path("github/url/", github_oauth_url, name="github_oauth_url"),
     path("github/callback/", github_oauth_callback, name="github_oauth_callback"),

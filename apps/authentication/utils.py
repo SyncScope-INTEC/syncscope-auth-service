@@ -205,3 +205,39 @@ def send_welcome_email(user_email, user_name, temp_password, plan="starter"):
         # Log error but don't expose to user
         print(f"Error sending welcome email: {str(e)}")
         return False
+
+
+def send_invitation_email(invitee_email, inviter_name, inviter_email, company_name, role, invitation_token):
+    """
+    Send company invitation email via alerts-service
+    Returns True if email was sent successfully, False otherwise
+    """
+    import requests
+
+    alerts_service_url = settings.ALERTS_SERVICE_URL
+    frontend_url = settings.FRONTEND_URL
+
+    # Prepare the payload
+    payload = {
+        "invitee_email": invitee_email,
+        "inviter_name": inviter_name,
+        "inviter_email": inviter_email,
+        "company_name": company_name,
+        "role": role,
+        "invitation_token": invitation_token,
+        "frontend_url": frontend_url,
+        "expiration_days": 7,
+    }
+
+    try:
+        # Call alerts-service API
+        response = requests.post(
+            f"{alerts_service_url}/alerts/send-company-invitation-email/",
+            json=payload,
+            timeout=10,
+        )
+        return response.status_code == 200
+    except Exception as e:
+        # Log error but don't expose to user
+        print(f"Error sending invitation email: {str(e)}")
+        return False

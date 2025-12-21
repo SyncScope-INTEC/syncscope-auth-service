@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from config.database_retry import database_retry
 
-from .models import Company, SupervisedUser, User, UserSession
+from .models import Company, CompanyInvitation, SupervisedUser, User, UserSession
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -504,3 +504,113 @@ class ChangeInitialPasswordResponseSerializer(serializers.Serializer):
 
     message = serializers.CharField()
     tokens = serializers.DictField(child=serializers.CharField(), help_text="New JWT tokens after password change")
+
+
+class CompanyInvitationSerializer(serializers.ModelSerializer):
+    """Serializer for company invitations"""
+
+    company_name = serializers.CharField(source="company.name", read_only=True)
+    inviter_name = serializers.CharField(source="inviter.full_name", read_only=True)
+    inviter_email = serializers.EmailField(source="inviter.email", read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+    is_valid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = CompanyInvitation
+        fields = [
+            "id",
+            "company",
+            "company_name",
+            "inviter",
+            "inviter_name",
+            "inviter_email",
+            "invitee_email",
+            "role",
+            "token",
+            "created_at",
+            "expires_at",
+            "is_accepted",
+            "accepted_at",
+            "is_expired",
+            "is_valid",
+        ]
+        read_only_fields = [
+            "id",
+            "token",
+            "created_at",
+            "expires_at",
+            "is_accepted",
+            "accepted_at",
+            "company_name",
+            "inviter_name",
+            "inviter_email",
+            "is_expired",
+            "is_valid",
+        ]
+
+
+class InviteUserSerializer(serializers.Serializer):
+    """Serializer for inviting a new user to join a company"""
+
+    invitee_email = serializers.EmailField(required=True, help_text="Email address of the person to invite")
+    role = serializers.ChoiceField(
+        choices=["admin", "supervisor", "developer"],
+        default="developer",
+        help_text="Role for the invited user (default: developer)",
+    )
+
+    def validate_invitee_email(self, value):
+        """Validate and normalize email"""
+        return value.lower()
+
+    @database_retry(max_retries=2)
+    def validate(self, attrs):
+        """Validate invitation request"""
+        user = self.context["request"].user
+        invitee_email = attrs["invitee_email"]
+
+        # Check if user already exists with this email
+        if User.objects.filter(email=invitee_email, is_active=True).exists():
+            existing_user = User.objects.get(email=invitee_email)
+            if existing_user.company == user.company:
+                raise serializers.ValidationError({"invitee_email": "This user is already part of your company"})
+
+        # Check if there's already a pending invitation
+        if CompanyInvitation.objects.filter(
+            company=user.company, invitee_email=invitee_email, is_accepted=False
+        ).exists():
+            raise serializers.ValidationError({"invitee_email": "An invitation has already been sent to this email"})
+
+        return attrs
+
+
+class AcceptInvitationSerializer(serializers.Serializer):
+    """Serializer for accepting a company invitation"""
+
+    token = serializers.CharField(required=True, help_text="Invitation token from the email")
+
+    @database_retry(max_retries=2)
+    def validate_token(self, value):
+        """Validate that the token exists and is valid"""
+        invitation = CompanyInvitation.get_active_invitation(value)
+        if not invitation:
+            raise serializers.ValidationError("Invalid or expired invitation token")
+
+        self.context["invitation"] = invitation
+        return value
+
+
+class InviteUserResponseSerializer(serializers.Serializer):
+    """Response serializer for invite user endpoint"""
+
+    message = serializers.CharField()
+    invitation_id = serializers.UUIDField()
+    invitee_email = serializers.EmailField()
+
+
+class AcceptInvitationResponseSerializer(serializers.Serializer):
+    """Response serializer for accept invitation endpoint"""
+
+    message = serializers.CharField()
+    user = UserProfileSerializer()
+    company_name = serializers.CharField()

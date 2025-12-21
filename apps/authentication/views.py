@@ -23,12 +23,17 @@ from config.database_retry import atomic_with_retry
 from .db_mixins import ServerlessViewMixin
 from .models import PasswordResetToken, SupervisedUser, User, UserSession
 from .serializers import (
+    AcceptInvitationResponseSerializer,
+    AcceptInvitationSerializer,
     AuthResponseSerializer,
     ChangeInitialPasswordResponseSerializer,
     ChangeInitialPasswordSerializer,
+    CompanyInvitationSerializer,
     ErrorResponseSerializer,
     ForgotPasswordResponseSerializer,
     ForgotPasswordSerializer,
+    InviteUserResponseSerializer,
+    InviteUserSerializer,
     LogoutResponseSerializer,
     LogoutSerializer,
     PasswordChangeResponseSerializer,
@@ -1149,3 +1154,187 @@ class ChangeInitialPasswordView(ServerlessViewMixin, APIView):
             {"message": "Password changed successfully. Please use your new password for future logins.", "tokens": tokens},
             status=status.HTTP_200_OK,
         )
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Company Invitations"],
+        summary="Invite a user to join your company",
+        description="Send an invitation email to a new user to join your company. Requires authentication. The invitee will receive an email with a link to accept the invitation and join via GitHub OAuth.",
+        request=InviteUserSerializer,
+        responses={
+            201: InviteUserResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Company Invitations"],
+        summary="List company invitations",
+        description="Get a list of all invitations sent by users in your company. Requires authentication.",
+        responses={
+            200: CompanyInvitationSerializer(many=True),
+            401: ErrorResponseSerializer,
+        },
+    ),
+)
+class CompanyInvitationView(ServerlessViewMixin, APIView):
+    """Create and list company invitations"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Send a company invitation"""
+        from .models import CompanyInvitation
+        from .utils import send_invitation_email
+
+        user = request.user
+
+        # Check if user has a company
+        if not user.company:
+            return Response(
+                {"error": "You must be associated with a company to send invitations"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check if user can invite (must be admin or supervisor)
+        if user.role not in ["admin", "supervisor"]:
+            return Response(
+                {"error": "Only administrators and supervisors can send invitations"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = InviteUserSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        invitee_email = serializer.validated_data["invitee_email"]
+        role = serializer.validated_data["role"]
+
+        # Create the invitation
+        invitation = CompanyInvitation.objects.create(
+            company=user.company, inviter=user, invitee_email=invitee_email, role=role
+        )
+
+        # Send invitation email
+        email_sent = send_invitation_email(
+            invitee_email=invitee_email,
+            inviter_name=user.full_name or user.email,
+            inviter_email=user.email,
+            company_name=user.company.name,
+            role=role,
+            invitation_token=invitation.token,
+        )
+
+        if not email_sent:
+            # Still return success even if email fails, but log it
+            logger.warning(f"Failed to send invitation email to {invitee_email}")
+
+        return Response(
+            {
+                "message": f"Invitation sent to {invitee_email}",
+                "invitation_id": invitation.id,
+                "invitee_email": invitee_email,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def get(self, request):
+        """List all invitations for the user's company"""
+        from .models import CompanyInvitation
+
+        user = request.user
+
+        if not user.company:
+            return Response([], status=status.HTTP_200_OK)
+
+        # Get all invitations for the company
+        invitations = CompanyInvitation.objects.filter(company=user.company).order_by("-created_at")
+        serializer = CompanyInvitationSerializer(invitations, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Company Invitations"],
+        summary="Accept a company invitation",
+        description="Accept a company invitation using the token from the email. This endpoint should be called after the user authenticates via GitHub OAuth. The user will be associated with the company.",
+        request=AcceptInvitationSerializer,
+        responses={
+            200: AcceptInvitationResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Company Invitations"],
+        summary="Validate invitation token",
+        description="Validate an invitation token without accepting it. Returns invitation details if valid.",
+        responses={
+            200: CompanyInvitationSerializer,
+            400: ErrorResponseSerializer,
+        },
+    ),
+)
+class AcceptInvitationView(ServerlessViewMixin, APIView):
+    """Accept or validate a company invitation"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Accept a company invitation"""
+        from .models import CompanyInvitation
+
+        serializer = AcceptInvitationSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = serializer.context["invitation"]
+        user = request.user
+
+        # Check if user is already part of a different company
+        if user.company and user.company != invitation.company:
+            return Response(
+                {"error": f"You are already part of {user.company.name}. Please contact support to change companies."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Accept the invitation (this also updates the user's company and role)
+        try:
+            invitation.accept(user)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Serialize user data
+        from .serializers import UserProfileSerializer
+
+        user.refresh_from_db()
+        user_serializer = UserProfileSerializer(user)
+
+        return Response(
+            {
+                "message": f"Welcome to {invitation.company.name}!",
+                "user": user_serializer.data,
+                "company_name": invitation.company.name,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def get(self, request):
+        """Validate invitation token and return invitation details"""
+        from .models import CompanyInvitation
+
+        token = request.query_params.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = CompanyInvitation.get_active_invitation(token)
+        if not invitation:
+            return Response({"error": "Invalid or expired invitation token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = CompanyInvitationSerializer(invitation)
+        return Response(serializer.data, status=status.HTTP_200_OK)

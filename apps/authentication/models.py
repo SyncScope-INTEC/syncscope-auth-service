@@ -315,3 +315,118 @@ class PasswordResetToken(RetryableModelMixin, models.Model):
     def invalidate_user_tokens(cls, user):
         """Invalidate all reset tokens for a user"""
         cls.objects.filter(user=user, is_used=False, is_invalidated=False).update(is_invalidated=True)
+
+
+class CompanyInvitation(RetryableModelMixin, models.Model):
+    """
+    Model for tracking company invitations to new employees
+    Allows company users to invite others via email to join their company
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="invitations", db_column="company_id"
+    )
+    inviter = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="sent_invitations", db_column="inviter_id"
+    )
+    invitee_email = models.EmailField(
+        validators=[EmailValidator()], help_text="Email address of the person being invited"
+    )
+    role = models.CharField(
+        max_length=50, choices=User.ROLE_CHOICES, default="developer", help_text="Role for the invited user"
+    )
+    token = models.CharField(max_length=255, unique=True, help_text="Unique invitation token")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(help_text="Invitation expires after 7 days")
+    is_accepted = models.BooleanField(default=False, help_text="Whether the invitation has been accepted")
+    accepted_at = models.DateTimeField(null=True, blank=True, help_text="When the invitation was accepted")
+    accepted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="accepted_invitations",
+        null=True,
+        blank=True,
+        db_column="accepted_by_id",
+        help_text="User who accepted the invitation",
+    )
+
+    objects = RetryableManager()
+
+    class Meta:
+        db_table = "company_invitations"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["company"]),
+            models.Index(fields=["invitee_email"]),
+            models.Index(fields=["token"]),
+            models.Index(fields=["expires_at"]),
+        ]
+        # Ensure we don't send duplicate active invitations to the same email for the same company
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "invitee_email"],
+                condition=models.Q(is_accepted=False, expires_at__gt=timezone.now()),
+                name="unique_active_invitation_per_email_company",
+            )
+        ]
+
+    def __str__(self):
+        return f"Invitation to {self.invitee_email} from {self.company.name}"
+
+    @atomic_with_retry()
+    def save(self, *args, **kwargs):
+        if not self.token:
+            # Generate a secure random token
+            import secrets
+
+            self.token = secrets.token_urlsafe(32)
+
+        if not self.expires_at:
+            # 7 days expiration
+            self.expires_at = timezone.now() + timedelta(days=7)
+
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        """Check if the invitation has expired"""
+        return timezone.now() > self.expires_at
+
+    def is_valid(self):
+        """Check if the invitation is valid (not expired, not accepted)"""
+        return not self.is_expired() and not self.is_accepted
+
+    @atomic_with_retry()
+    def accept(self, user):
+        """Mark the invitation as accepted by a user"""
+        if not self.is_valid():
+            raise ValueError("Cannot accept an expired or already accepted invitation")
+
+        self.is_accepted = True
+        self.accepted_at = timezone.now()
+        self.accepted_by = user
+        self.save()
+
+        # Associate the user with the company
+        user.company = self.company
+        user.role = self.role
+        user.save()
+
+    @classmethod
+    @atomic_with_retry()
+    def cleanup_expired_invitations(cls):
+        """Delete expired invitations"""
+        cutoff_time = timezone.now() - timedelta(days=30)
+        cls.objects.filter(expires_at__lt=timezone.now(), created_at__lt=cutoff_time).delete()
+
+    @classmethod
+    @atomic_with_retry()
+    def get_active_invitation(cls, token):
+        """Get an active (valid) invitation by token"""
+        try:
+            invitation = cls.objects.get(
+                token=token, is_accepted=False, expires_at__gt=timezone.now()
+            )
+            return invitation
+        except cls.DoesNotExist:
+            return None
