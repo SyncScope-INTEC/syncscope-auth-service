@@ -576,9 +576,7 @@ class InviteUserSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"invitee_email": "This user is already part of your company"})
 
         # Check if there's already a pending invitation
-        if CompanyInvitation.objects.filter(
-            company=user.company, invitee_email=invitee_email, is_accepted=False
-        ).exists():
+        if CompanyInvitation.objects.filter(company=user.company, invitee_email=invitee_email, is_accepted=False).exists():
             raise serializers.ValidationError({"invitee_email": "An invitation has already been sent to this email"})
 
         return attrs

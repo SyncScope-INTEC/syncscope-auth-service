@@ -324,15 +324,9 @@ class CompanyInvitation(RetryableModelMixin, models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name="invitations", db_column="company_id"
-    )
-    inviter = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="sent_invitations", db_column="inviter_id"
-    )
-    invitee_email = models.EmailField(
-        validators=[EmailValidator()], help_text="Email address of the person being invited"
-    )
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="invitations", db_column="company_id")
+    inviter = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_invitations", db_column="inviter_id")
+    invitee_email = models.EmailField(validators=[EmailValidator()], help_text="Email address of the person being invited")
     role = models.CharField(
         max_length=50, choices=User.ROLE_CHOICES, default="developer", help_text="Role for the invited user"
     )
@@ -424,9 +418,7 @@ class CompanyInvitation(RetryableModelMixin, models.Model):
     def get_active_invitation(cls, token):
         """Get an active (valid) invitation by token"""
         try:
-            invitation = cls.objects.get(
-                token=token, is_accepted=False, expires_at__gt=timezone.now()
-            )
+            invitation = cls.objects.get(token=token, is_accepted=False, expires_at__gt=timezone.now())
             return invitation
         except cls.DoesNotExist:
             return None
