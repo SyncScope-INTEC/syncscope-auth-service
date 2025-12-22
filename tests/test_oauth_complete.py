@@ -373,7 +373,7 @@ class TestGitHubOAuthViews(APITestCase):
         mock_get_user_data.return_value = {"id": 12345, "login": "testuser", "email": "test@example.com", "name": "Test User"}
 
         mock_user = User.objects.create_user(email="test@example.com", first_name="Test", last_name="User")
-        mock_create_user.return_value = mock_user
+        mock_create_user.return_value = (mock_user, True)  # Return tuple (user, is_new_user)
         mock_get_tokens.return_value = {"access": "token", "refresh": "token"}
         mock_create_session.return_value = (MagicMock(), "session_token")
 
@@ -384,6 +384,7 @@ class TestGitHubOAuthViews(APITestCase):
         self.assertIn("user", response.data)
         self.assertIn("tokens", response.data)
         self.assertIn("session_token", response.data)
+        self.assertIn("invitation_accepted", response.data)
 
     @patch("apps.authentication.oauth.exchange_code_for_token")
     @patch("apps.authentication.oauth.settings")
