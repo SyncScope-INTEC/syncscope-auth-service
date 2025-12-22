@@ -187,12 +187,13 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         existing_user = User.objects.create_user(email="old@example.com", first_name="Old", last_name="User")
 
         # This should create a new user since email doesn't match
-        user = create_or_update_user_from_github(self.github_data)
+        user, is_new_user = create_or_update_user_from_github(self.github_data)
 
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
         self.assertEqual(user.role, "developer")
+        self.assertTrue(is_new_user)
 
     def test_create_or_update_user_existing_email(self):
         """Test updating existing user by email"""
@@ -200,12 +201,13 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         existing_user = User.objects.create_user(email="test@example.com", first_name="Old", last_name="User")
 
         # This should update the existing user
-        user = create_or_update_user_from_github(self.github_data)
+        user, is_new_user = create_or_update_user_from_github(self.github_data)
 
         self.assertEqual(user.id, existing_user.id)  # Same user
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Old")  # Preserved existing name
         self.assertEqual(user.last_name, "User")  # Preserved existing name
+        self.assertFalse(is_new_user)
 
     def test_create_or_update_user_existing_email_with_company(self):
         """Test updating existing user with company"""
@@ -213,16 +215,17 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         existing_user = User.objects.create_user(email="test@example.com", first_name="Old", last_name="User")
 
         # This should update the existing user
-        user = create_or_update_user_from_github(self.github_data)
+        user, is_new_user = create_or_update_user_from_github(self.github_data)
 
         self.assertEqual(user.id, existing_user.id)  # Same user
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Old")  # Preserved existing name
         self.assertEqual(user.last_name, "User")  # Preserved existing name
+        self.assertFalse(is_new_user)
 
     def test_create_new_user(self):
         """Test creating new user"""
-        user = create_or_update_user_from_github(self.github_data)
+        user, is_new_user = create_or_update_user_from_github(self.github_data)
 
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
@@ -230,55 +233,60 @@ class TestCreateOrUpdateUserFromGitHub(TestCase):
         self.assertEqual(user.role, "developer")
         self.assertIsNotNone(user.company)
         self.assertEqual(user.company.name, "Test Company")
+        self.assertTrue(is_new_user)
 
     def test_create_new_user_no_company(self):
         """Test creating new user without company"""
         github_data = self.github_data.copy()
         github_data["company"] = None
 
-        user = create_or_update_user_from_github(github_data)
+        user, is_new_user = create_or_update_user_from_github(github_data)
 
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "Test")
         self.assertEqual(user.last_name, "User")
         self.assertEqual(user.role, "developer")
         self.assertIsNone(user.company)
+        self.assertTrue(is_new_user)
 
     def test_create_new_user_no_name(self):
         """Test creating new user without name"""
         github_data = self.github_data.copy()
         github_data["name"] = None
 
-        user = create_or_update_user_from_github(github_data)
+        user, is_new_user = create_or_update_user_from_github(github_data)
 
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "")  # Empty since no name provided
         self.assertEqual(user.last_name, "")  # Empty since no name provided
         self.assertEqual(user.role, "developer")
+        self.assertTrue(is_new_user)
 
     def test_create_new_user_empty_name(self):
         """Test creating new user with empty name"""
         github_data = self.github_data.copy()
         github_data["name"] = ""
 
-        user = create_or_update_user_from_github(github_data)
+        user, is_new_user = create_or_update_user_from_github(github_data)
 
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "")  # Empty since name is empty
         self.assertEqual(user.last_name, "")  # Empty since name is empty
         self.assertEqual(user.role, "developer")
+        self.assertTrue(is_new_user)
 
     def test_create_new_user_single_name(self):
         """Test creating new user with single name"""
         github_data = self.github_data.copy()
         github_data["name"] = "SingleName"
 
-        user = create_or_update_user_from_github(github_data)
+        user, is_new_user = create_or_update_user_from_github(github_data)
 
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.first_name, "SingleName")  # First name gets the single name
         self.assertEqual(user.last_name, "")  # Last name is empty
         self.assertEqual(user.role, "developer")
+        self.assertTrue(is_new_user)
 
 
 class TestGitHubOAuthViews(APITestCase):
