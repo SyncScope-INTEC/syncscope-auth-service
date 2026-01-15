@@ -119,8 +119,9 @@ def create_or_update_user_from_github(github_data, invitation_token=None):
 @permission_classes([AllowAny])
 def github_oauth_callback(request):
     """Handle GitHub OAuth callback"""
-    from .models import CompanyInvitation
     from django.shortcuts import redirect
+
+    from .models import CompanyInvitation
 
     code = request.GET.get("code")
     state = request.GET.get("state")  # Get state parameter if present (desktop agent)
