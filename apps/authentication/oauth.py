@@ -120,9 +120,10 @@ def create_or_update_user_from_github(github_data, invitation_token=None):
 def github_oauth_callback(request):
     """Handle GitHub OAuth callback"""
     from .models import CompanyInvitation
+    from django.shortcuts import redirect
 
     code = request.GET.get("code")
-    state = request.GET.get("state")  # Get state parameter if present
+    state = request.GET.get("state")  # Get state parameter if present (desktop agent)
     invitation_token = request.GET.get("invitation_token")  # Check for invitation token
 
     if not code:
@@ -236,19 +237,30 @@ def github_oauth_callback(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def github_oauth_url(request):
-    """Get GitHub OAuth URL with optional invitation token"""
+    """Get GitHub OAuth URL with optional invitation token and frontend redirect"""
     if not settings.GITHUB_CLIENT_ID:
         return Response({"error": "GitHub OAuth not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Get invitation token from query params if present
+    # Get invitation token and frontend redirect URI from query params
     invitation_token = request.GET.get("invitation_token")
+    frontend_redirect = request.GET.get("redirect_uri")
 
-    # Build redirect URI with proper HTTPS handling
-    redirect_uri = request.build_absolute_uri("/auth/github/callback/")
+    # Determine redirect URI
+    if frontend_redirect:
+        # Frontend specified where to redirect - use it directly
+        # This allows GitHub to redirect straight to the frontend
+        redirect_uri = frontend_redirect
 
-    # Ensure HTTPS for production deployments
-    if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
-        redirect_uri = redirect_uri.replace("http://", "https://")
+        # Ensure HTTPS for production deployments
+        if "railway.app" in redirect_uri and not redirect_uri.startswith("https://"):
+            redirect_uri = redirect_uri.replace("http://", "https://")
+    else:
+        # No frontend redirect specified - use backend callback (desktop agent flow)
+        redirect_uri = request.build_absolute_uri("/auth/github/callback/")
+
+        # Ensure HTTPS for production deployments
+        if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
+            redirect_uri = redirect_uri.replace("http://", "https://")
 
     # Add invitation token to redirect URI if present
     if invitation_token:
