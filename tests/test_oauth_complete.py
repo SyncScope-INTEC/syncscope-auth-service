@@ -379,12 +379,11 @@ class TestGitHubOAuthViews(APITestCase):
 
         response = self.client.get(self.callback_url + "?code=test_code")
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("message", response.data)
-        self.assertIn("user", response.data)
-        self.assertIn("tokens", response.data)
-        self.assertIn("session_token", response.data)
-        self.assertIn("invitation_accepted", response.data)
+        # Web OAuth flow should redirect to frontend (302) instead of returning JSON
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        # Check that it redirects to frontend callback with token_key
+        self.assertTrue(response.url.startswith("https://syncscope-frontend-dev.up.railway.app/auth/github/callback"))
+        self.assertIn("token_key=", response.url)
 
     @patch("apps.authentication.oauth.exchange_code_for_token")
     @patch("apps.authentication.oauth.settings")
