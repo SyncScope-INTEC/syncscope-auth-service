@@ -200,6 +200,7 @@ def github_oauth_callback(request):
             else:
                 # Web OAuth flow - store tokens in cache and redirect to frontend
                 import uuid
+
                 web_token_key = str(uuid.uuid4())
                 cache.set(
                     f"web_oauth_tokens_{web_token_key}",
