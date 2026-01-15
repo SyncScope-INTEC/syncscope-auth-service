@@ -197,8 +197,27 @@ def github_oauth_callback(request):
 
                     template = loader.get_template("authentication/oauth_callback.html")
                     return HttpResponse(template.render({}, request))
+            else:
+                # Web OAuth flow - store tokens in cache and redirect to frontend
+                import uuid
+                web_token_key = str(uuid.uuid4())
+                cache.set(
+                    f"web_oauth_tokens_{web_token_key}",
+                    {
+                        "user": response_data["user"],
+                        "tokens": response_data["tokens"],
+                        "session_token": response_data["session_token"],
+                        "invitation_accepted": invitation_accepted,
+                    },
+                    timeout=300,  # 5 minutes
+                )
 
-            # Regular web OAuth flow - return JSON
+                # Redirect to frontend with token key
+                frontend_url = settings.FRONTEND_URL or "https://syncscope-frontend-dev.up.railway.app"
+                redirect_url = f"{frontend_url}/auth/github/callback?token_key={web_token_key}"
+                return redirect(redirect_url)
+
+            # Should not reach here
             return Response(response_data, status=status.HTTP_200_OK)
 
     except requests.RequestException as e:
@@ -237,30 +256,19 @@ def github_oauth_callback(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def github_oauth_url(request):
-    """Get GitHub OAuth URL with optional invitation token and frontend redirect"""
+    """Get GitHub OAuth URL with optional invitation token"""
     if not settings.GITHUB_CLIENT_ID:
         return Response({"error": "GitHub OAuth not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Get invitation token and frontend redirect URI from query params
+    # Get invitation token from query params if present
     invitation_token = request.GET.get("invitation_token")
-    frontend_redirect = request.GET.get("redirect_uri")
 
-    # Determine redirect URI
-    if frontend_redirect:
-        # Frontend specified where to redirect - use it directly
-        # This allows GitHub to redirect straight to the frontend
-        redirect_uri = frontend_redirect
+    # Build redirect URI - always use backend callback
+    redirect_uri = request.build_absolute_uri("/auth/github/callback/")
 
-        # Ensure HTTPS for production deployments
-        if "railway.app" in redirect_uri and not redirect_uri.startswith("https://"):
-            redirect_uri = redirect_uri.replace("http://", "https://")
-    else:
-        # No frontend redirect specified - use backend callback (desktop agent flow)
-        redirect_uri = request.build_absolute_uri("/auth/github/callback/")
-
-        # Ensure HTTPS for production deployments
-        if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
-            redirect_uri = redirect_uri.replace("http://", "https://")
+    # Ensure HTTPS for production deployments
+    if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
+        redirect_uri = redirect_uri.replace("http://", "https://")
 
     # Add invitation token to redirect URI if present
     if invitation_token:
@@ -355,3 +363,31 @@ def github_oauth_status(request, state_id):
         return Response({"status": "error", "error": error_message}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({"status": "unknown", "error": "Invalid state"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def github_web_tokens(request, token_key):
+    """Retrieve OAuth tokens for web flow using token key"""
+    cache_key = f"web_oauth_tokens_{token_key}"
+    token_data = cache.get(cache_key)
+
+    if not token_data:
+        return Response(
+            {"error": "Token key expired or not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Return tokens and clean up
+    response_data = {
+        "message": "Authentication successful",
+        "user": token_data["user"],
+        "tokens": token_data["tokens"],
+        "session_token": token_data["session_token"],
+        "invitation_accepted": token_data.get("invitation_accepted", False),
+    }
+
+    # Delete from cache after retrieval
+    cache.delete(cache_key)
+
+    return Response(response_data, status=status.HTTP_200_OK)
