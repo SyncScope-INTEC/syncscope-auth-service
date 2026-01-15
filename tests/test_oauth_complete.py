@@ -368,6 +368,7 @@ class TestGitHubOAuthViews(APITestCase):
         """Test successful OAuth callback"""
         mock_settings.GITHUB_CLIENT_ID = "test_client_id"
         mock_settings.GITHUB_CLIENT_SECRET = "test_client_secret"
+        mock_settings.FRONTEND_URL = "https://syncscope-frontend-dev.up.railway.app"
 
         mock_exchange.return_value = "access_token"
         mock_get_user_data.return_value = {"id": 12345, "login": "testuser", "email": "test@example.com", "name": "Test User"}
