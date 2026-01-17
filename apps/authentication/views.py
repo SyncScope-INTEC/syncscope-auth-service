@@ -1,3 +1,4 @@
+import logging
 import os
 
 from django.contrib.auth import authenticate
@@ -70,6 +71,8 @@ from .utils import (
     send_welcome_email,
     validate_session_token,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema_view(
@@ -1212,6 +1215,24 @@ class CompanyInvitationView(ServerlessViewMixin, APIView):
 
         invitee_email = serializer.validated_data["invitee_email"]
         role = serializer.validated_data["role"]
+
+        # Check for existing pending invitation
+        existing_invitation = CompanyInvitation.objects.filter(
+            company=user.company,
+            invitee_email=invitee_email,
+            is_accepted=False,
+        ).first()
+
+        if existing_invitation:
+            if existing_invitation.is_expired():
+                # Delete expired invitation to allow sending a new one
+                existing_invitation.delete()
+            else:
+                # Active invitation already exists
+                return Response(
+                    {"error": f"An invitation has already been sent to {invitee_email}. Please wait for it to expire or be accepted."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Create the invitation
         invitation = CompanyInvitation.objects.create(

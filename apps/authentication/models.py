@@ -75,10 +75,12 @@ class User(RetryableModelMixin, AbstractUser):
         default=False,
         help_text="Flag indicating user must change their password on next login (e.g., temporary password from Stripe setup)",
     )
-    # Remove fields that aren't in the new schema
-    # is_verified = models.BooleanField(default=False)
-    # github_id = models.CharField(max_length=50, null=True, blank=True, unique=True)
-    # avatar_url = models.URLField(max_length=500, null=True, blank=True)
+    github_username = models.CharField(
+        max_length=100, null=True, blank=True, help_text="GitHub username from OAuth login"
+    )
+    gitlab_username = models.CharField(
+        max_length=100, null=True, blank=True, help_text="GitLab username from OAuth login"
+    )
 
     username = None
     USERNAME_FIELD = "email"
@@ -356,12 +358,14 @@ class CompanyInvitation(RetryableModelMixin, models.Model):
             models.Index(fields=["token"]),
             models.Index(fields=["expires_at"]),
         ]
-        # Ensure we don't send duplicate active invitations to the same email for the same company
+        # Ensure we don't send duplicate pending invitations to the same email for the same company
+        # Note: We only check is_accepted=False here. Expired invitation handling is done at
+        # the application level via cleanup_expired_invitations() and validation in views.
         constraints = [
             models.UniqueConstraint(
                 fields=["company", "invitee_email"],
-                condition=models.Q(is_accepted=False, expires_at__gt=timezone.now()),
-                name="unique_active_invitation_per_email_company",
+                condition=models.Q(is_accepted=False),
+                name="unique_pending_invitation_per_email_company",
             )
         ]
 

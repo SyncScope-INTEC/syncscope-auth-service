@@ -85,6 +85,10 @@ def create_or_update_user_from_github(github_data, invitation_token=None):
             if len(name_parts) > 1 and not user.last_name:
                 user.last_name = name_parts[1]
 
+        # Always update GitHub username when logging in with GitHub
+        if github_data.get("login"):
+            user.github_username = github_data["login"]
+
         user.save()
         return user, False  # Existing user
 
@@ -110,6 +114,7 @@ def create_or_update_user_from_github(github_data, invitation_token=None):
             last_name=name_parts[1] if len(name_parts) > 1 else "",
             company=company,
             role="developer",  # Default role for OAuth users
+            github_username=github_data.get("login"),
         )
 
         return user, True  # New user
