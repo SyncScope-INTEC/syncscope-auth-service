@@ -1230,7 +1230,9 @@ class CompanyInvitationView(ServerlessViewMixin, APIView):
             else:
                 # Active invitation already exists
                 return Response(
-                    {"error": f"An invitation has already been sent to {invitee_email}. Please wait for it to expire or be accepted."},
+                    {
+                        "error": f"An invitation has already been sent to {invitee_email}. Please wait for it to expire or be accepted."
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

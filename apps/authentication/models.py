@@ -75,12 +75,8 @@ class User(RetryableModelMixin, AbstractUser):
         default=False,
         help_text="Flag indicating user must change their password on next login (e.g., temporary password from Stripe setup)",
     )
-    github_username = models.CharField(
-        max_length=100, null=True, blank=True, help_text="GitHub username from OAuth login"
-    )
-    gitlab_username = models.CharField(
-        max_length=100, null=True, blank=True, help_text="GitLab username from OAuth login"
-    )
+    github_username = models.CharField(max_length=100, null=True, blank=True, help_text="GitHub username from OAuth login")
+    gitlab_username = models.CharField(max_length=100, null=True, blank=True, help_text="GitLab username from OAuth login")
 
     username = None
     USERNAME_FIELD = "email"

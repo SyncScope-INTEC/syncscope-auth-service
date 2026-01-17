@@ -150,7 +150,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "github_username",
             "gitlab_username",
         ]
-        read_only_fields = ["id", "email", "created_at", "updated_at", "profile_image_path", "github_username", "gitlab_username"]
+        read_only_fields = [
+            "id",
+            "email",
+            "created_at",
+            "updated_at",
+            "profile_image_path",
+            "github_username",
+            "gitlab_username",
+        ]
 
     def get_plan_limits(self, obj):
         """Get the limits and features for the user's plan"""
