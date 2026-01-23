@@ -42,26 +42,22 @@ class Command(BaseCommand):
                 self.stdout.write("Checking current admin log configuration...")
 
                 # Check if table exists
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_name = 'django_admin_log'
                     );
-                """
-                )
+                """)
                 table_exists = cursor.fetchone()[0]
 
                 if table_exists:
                     # Check current user_id type
-                    cursor.execute(
-                        """
+                    cursor.execute("""
                         SELECT data_type
                         FROM information_schema.columns
                         WHERE table_name = 'django_admin_log'
                         AND column_name = 'user_id'
-                    """
-                    )
+                    """)
                     current_type = cursor.fetchone()
                     self.stdout.write(f'Current user_id type: {current_type[0] if current_type else "unknown"}')
 
@@ -83,14 +79,12 @@ class Command(BaseCommand):
 
             # Verify the fix
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT data_type
                     FROM information_schema.columns
                     WHERE table_name = 'django_admin_log'
                     AND column_name = 'user_id'
-                """
-                )
+                """)
                 new_type = cursor.fetchone()
 
                 if new_type and new_type[0] == "uuid":

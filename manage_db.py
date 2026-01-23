@@ -2,6 +2,7 @@
 """
 Database management script for Railway PostgreSQL setup
 """
+
 import os
 import sys
 
@@ -54,8 +55,7 @@ def create_superuser():
 
 def main():
     if len(sys.argv) < 2:
-        print(
-            """
+        print("""
 Railway PostgreSQL Database Setup
 
 Usage:
@@ -63,8 +63,7 @@ Usage:
     python manage_db.py migrate   - Run migrations
     python manage_db.py superuser - Create superuser
     python manage_db.py setup     - Run complete setup (schema + migrations)
-        """
-        )
+        """)
         return
 
     command = sys.argv[1]

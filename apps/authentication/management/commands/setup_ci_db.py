@@ -182,13 +182,11 @@ class Command(BaseCommand):
         try:
             with connection.cursor() as cursor:
                 # Get all table names
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT table_name 
                     FROM information_schema.tables 
                     WHERE table_schema = CURRENT_SCHEMA()
-                """
-                )
+                """)
                 existing_tables = [row[0] for row in cursor.fetchall()]
 
                 self.stdout.write(f"📋 Found {len(existing_tables)} tables in current schema")

@@ -36,14 +36,12 @@ class Command(BaseCommand):
                 self.stdout.write(f"User table reference: {users_table}")
 
                 # Check if fix is needed
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT data_type
                     FROM information_schema.columns
                     WHERE table_name = 'django_admin_log'
                     AND column_name = 'user_id'
-                """
-                )
+                """)
                 current_type = cursor.fetchone()
 
                 if current_type and current_type[0] == "uuid":
@@ -65,14 +63,12 @@ class Command(BaseCommand):
                 cursor.execute("ALTER TABLE django_admin_log ALTER COLUMN user_id TYPE UUID;")
 
                 self.stdout.write("Re-adding foreign key constraint...")
-                cursor.execute(
-                    f"""
+                cursor.execute(f"""
                     ALTER TABLE django_admin_log
                     ADD CONSTRAINT django_admin_log_user_id_fkey
                     FOREIGN KEY (user_id) REFERENCES {users_table}(id)
                     ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
-                """
-                )
+                """)
 
                 self.stdout.write(self.style.SUCCESS("Successfully fixed admin log user_id type mismatch"))
 

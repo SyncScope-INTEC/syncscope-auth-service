@@ -28,26 +28,22 @@ class Command(BaseCommand):
             cursor.execute("CREATE SCHEMA IF NOT EXISTS auth;")
 
             # Check what tables exist in public vs auth
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT table_name 
                 FROM information_schema.tables 
                 WHERE table_schema = 'public' 
                 AND table_name IN ('authentication_user', 'companies', 'user_sessions')
                 ORDER BY table_name;
-            """
-            )
+            """)
             public_tables = [row[0] for row in cursor.fetchall()]
 
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT table_name 
                 FROM information_schema.tables 
                 WHERE table_schema = 'auth' 
                 AND table_name IN ('users', 'companies', 'user_sessions', 'authentication_user')
                 ORDER BY table_name;
-            """
-            )
+            """)
             auth_tables = [row[0] for row in cursor.fetchall()]
 
             self.stdout.write(f"Tables in public: {public_tables}")
@@ -60,14 +56,12 @@ class Command(BaseCommand):
                 if not dry_run:
                     cursor.execute("SET search_path TO auth, public;")
                     # Update the django_migrations table to reflect we're using auth schema
-                    cursor.execute(
-                        """
+                    cursor.execute("""
                         UPDATE django_migrations 
                         SET applied = NOW() 
                         WHERE app = 'authentication' 
                         AND name = '0001_initial';
-                    """
-                    )
+                    """)
                 else:
                     self.stdout.write("Would update django_migrations table")
 
@@ -84,13 +78,11 @@ class Command(BaseCommand):
                 self.stdout.write(f"Dropping public.{table} (exists in auth schema)...")
                 if not dry_run:
                     # Drop foreign key constraints first
-                    cursor.execute(
-                        f"""
+                    cursor.execute(f"""
                         SELECT conname, conrelid::regclass
                         FROM pg_constraint 
                         WHERE confrelid = 'public.{table}'::regclass;
-                    """
-                    )
+                    """)
                     constraints = cursor.fetchall()
 
                     for constraint_name, table_name in constraints:
