@@ -264,7 +264,7 @@ class TestRateLimitMiddleware:
     @patch("apps.authentication.middleware.cache")
     def test_rate_limit_exceeded(self, mock_cache):
         """Test that rate limit exceeded returns 429."""
-        mock_cache.get.return_value = 5  # At limit
+        mock_cache.get.return_value = 50  # At limit
 
         request = RequestFactory().get("/auth/login")
         request.META["REMOTE_ADDR"] = "127.0.0.1"
@@ -311,7 +311,7 @@ class TestRateLimitMiddleware:
         def get_response(request):
             return HttpResponse("OK")
 
-        # Test login endpoint (5 requests limit)
+        # Test login endpoint (50 requests limit)
         request_login = RequestFactory().get("/auth/login")
         request_login.META["REMOTE_ADDR"] = "127.0.0.1"
 
@@ -319,16 +319,16 @@ class TestRateLimitMiddleware:
         middleware.process_request(request_login)
 
         # Check rate limit info
-        assert request_login._rate_limit_info["limit"] == 5
+        assert request_login._rate_limit_info["limit"] == 50
 
-        # Test other auth endpoint (30 requests limit)
+        # Test other auth endpoint (50 requests limit)
         request_profile = RequestFactory().get("/auth/profile")
         request_profile.META["REMOTE_ADDR"] = "127.0.0.1"
 
         middleware.process_request(request_profile)
 
         # Check rate limit info
-        assert request_profile._rate_limit_info["limit"] == 30
+        assert request_profile._rate_limit_info["limit"] == 50
 
     def test_get_client_ip_x_forwarded_for(self):
         """Test client IP extraction from X-Forwarded-For header."""
