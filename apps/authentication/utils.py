@@ -139,7 +139,9 @@ def send_reset_email(user_email, user_name, reset_code):
             logger.info(f"Password reset email sent successfully to {user_email}")
             return True
         else:
-            logger.error(f"Failed to send reset email to {user_email}. Status: {response.status_code}, Response: {response.text}")
+            logger.error(
+                f"Failed to send reset email to {user_email}. Status: {response.status_code}, Response: {response.text}"
+            )
             return False
     except Exception as e:
         logger.error(f"Error sending reset email to {user_email}: {str(e)}", exc_info=True)
@@ -207,7 +209,9 @@ def send_welcome_email(user_email, user_name, temp_password, plan="starter"):
             logger.info(f"Welcome email sent successfully to {user_email}")
             return True
         else:
-            logger.error(f"Failed to send welcome email to {user_email}. Status: {response.status_code}, Response: {response.text}")
+            logger.error(
+                f"Failed to send welcome email to {user_email}. Status: {response.status_code}, Response: {response.text}"
+            )
             return False
     except Exception as e:
         logger.error(f"Error sending welcome email to {user_email}: {str(e)}", exc_info=True)
@@ -245,7 +249,9 @@ def send_invitation_email(invitee_email, inviter_name, inviter_email, company_na
             logger.info(f"Invitation email sent successfully to {invitee_email}")
             return True
         else:
-            logger.error(f"Failed to send invitation email to {invitee_email}. Status: {response.status_code}, Response: {response.text}")
+            logger.error(
+                f"Failed to send invitation email to {invitee_email}. Status: {response.status_code}, Response: {response.text}"
+            )
             return False
     except Exception as e:
         logger.error(f"Error sending invitation email to {invitee_email}: {str(e)}", exc_info=True)
