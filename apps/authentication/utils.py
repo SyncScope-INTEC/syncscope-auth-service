@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta
 
@@ -9,6 +10,8 @@ from config.database_retry import database_retry
 
 from .models import UserSession
 from .tokens import SecureRefreshToken
+
+logger = logging.getLogger(__name__)
 
 
 def generate_session_token():
@@ -129,15 +132,17 @@ def send_reset_email(user_email, user_name, reset_code):
 
     try:
         # Call alerts-service API
-        response = requests.post(
-            f"{alerts_service_url}/alerts/send-password-reset-email/",
-            json=payload,
-            timeout=10,
-        )
-        return response.status_code == 200
+        url = f"{alerts_service_url}/alerts/send-password-reset-email/"
+        logger.info(f"Sending password reset email to {user_email} via {url}")
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            logger.info(f"Password reset email sent successfully to {user_email}")
+            return True
+        else:
+            logger.error(f"Failed to send reset email to {user_email}. Status: {response.status_code}, Response: {response.text}")
+            return False
     except Exception as e:
-        # Log error but don't expose to user
-        print(f"Error sending reset email: {str(e)}")
+        logger.error(f"Error sending reset email to {user_email}: {str(e)}", exc_info=True)
         return False
 
 
@@ -195,15 +200,17 @@ def send_welcome_email(user_email, user_name, temp_password, plan="starter"):
 
     try:
         # Call alerts-service API
-        response = requests.post(
-            f"{alerts_service_url}/alerts/send-welcome-email/",
-            json=payload,
-            timeout=10,
-        )
-        return response.status_code == 200
+        url = f"{alerts_service_url}/alerts/send-welcome-email/"
+        logger.info(f"Sending welcome email to {user_email} via {url}")
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            logger.info(f"Welcome email sent successfully to {user_email}")
+            return True
+        else:
+            logger.error(f"Failed to send welcome email to {user_email}. Status: {response.status_code}, Response: {response.text}")
+            return False
     except Exception as e:
-        # Log error but don't expose to user
-        print(f"Error sending welcome email: {str(e)}")
+        logger.error(f"Error sending welcome email to {user_email}: {str(e)}", exc_info=True)
         return False
 
 
@@ -231,13 +238,15 @@ def send_invitation_email(invitee_email, inviter_name, inviter_email, company_na
 
     try:
         # Call alerts-service API
-        response = requests.post(
-            f"{alerts_service_url}/alerts/send-company-invitation-email/",
-            json=payload,
-            timeout=10,
-        )
-        return response.status_code == 200
+        url = f"{alerts_service_url}/alerts/send-company-invitation-email/"
+        logger.info(f"Sending invitation email to {invitee_email} for company {company_name} via {url}")
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            logger.info(f"Invitation email sent successfully to {invitee_email}")
+            return True
+        else:
+            logger.error(f"Failed to send invitation email to {invitee_email}. Status: {response.status_code}, Response: {response.text}")
+            return False
     except Exception as e:
-        # Log error but don't expose to user
-        print(f"Error sending invitation email: {str(e)}")
+        logger.error(f"Error sending invitation email to {invitee_email}: {str(e)}", exc_info=True)
         return False
