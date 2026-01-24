@@ -996,6 +996,140 @@ class TestPasswordResetAPI:
         result = send_reset_email("test@example.com", "Test User", "123456")
         assert result is False
 
+    def test_send_reset_email_success(self, monkeypatch):
+        """Test send_reset_email returns True on successful API call"""
+        from apps.authentication.utils import send_reset_email
+
+        class MockResponse:
+            status_code = 200
+            text = "OK"
+
+        def mock_post_success(*args, **kwargs):
+            return MockResponse()
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_success)
+        result = send_reset_email("test@example.com", "Test User", "123456")
+        assert result is True
+
+    def test_send_reset_email_api_error(self, monkeypatch):
+        """Test send_reset_email returns False on non-200 status"""
+        from apps.authentication.utils import send_reset_email
+
+        class MockResponse:
+            status_code = 500
+            text = "Internal Server Error"
+
+        def mock_post_error(*args, **kwargs):
+            return MockResponse()
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_error)
+        result = send_reset_email("test@example.com", "Test User", "123456")
+        assert result is False
+
+    def test_send_welcome_email_success(self, monkeypatch):
+        """Test send_welcome_email returns True on successful API call"""
+        from apps.authentication.utils import send_welcome_email
+
+        class MockResponse:
+            status_code = 200
+            text = "OK"
+
+        def mock_post_success(*args, **kwargs):
+            return MockResponse()
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_success)
+        result = send_welcome_email("test@example.com", "Test User", "TempPass123!")
+        assert result is True
+
+    def test_send_welcome_email_api_error(self, monkeypatch):
+        """Test send_welcome_email returns False on non-200 status"""
+        from apps.authentication.utils import send_welcome_email
+
+        class MockResponse:
+            status_code = 500
+            text = "Internal Server Error"
+
+        def mock_post_error(*args, **kwargs):
+            return MockResponse()
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_error)
+        result = send_welcome_email("test@example.com", "Test User", "TempPass123!")
+        assert result is False
+
+    def test_send_welcome_email_exception(self, monkeypatch):
+        """Test send_welcome_email returns False on exception"""
+        from apps.authentication.utils import send_welcome_email
+
+        def mock_post_exception(*args, **kwargs):
+            raise Exception("Connection error")
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_exception)
+        result = send_welcome_email("test@example.com", "Test User", "TempPass123!")
+        assert result is False
+
+    def test_send_invitation_email_success(self, monkeypatch):
+        """Test send_invitation_email returns True on successful API call"""
+        from apps.authentication.utils import send_invitation_email
+
+        class MockResponse:
+            status_code = 200
+            text = "OK"
+
+        def mock_post_success(*args, **kwargs):
+            return MockResponse()
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_success)
+        result = send_invitation_email(
+            "invitee@example.com", "Inviter Name", "inviter@example.com", "Test Company", "developer", "token123"
+        )
+        assert result is True
+
+    def test_send_invitation_email_api_error(self, monkeypatch):
+        """Test send_invitation_email returns False on non-200 status"""
+        from apps.authentication.utils import send_invitation_email
+
+        class MockResponse:
+            status_code = 500
+            text = "Internal Server Error"
+
+        def mock_post_error(*args, **kwargs):
+            return MockResponse()
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_error)
+        result = send_invitation_email(
+            "invitee@example.com", "Inviter Name", "inviter@example.com", "Test Company", "developer", "token123"
+        )
+        assert result is False
+
+    def test_send_invitation_email_exception(self, monkeypatch):
+        """Test send_invitation_email returns False on exception"""
+        from apps.authentication.utils import send_invitation_email
+
+        def mock_post_exception(*args, **kwargs):
+            raise Exception("Connection error")
+
+        import requests
+
+        monkeypatch.setattr(requests, "post", mock_post_exception)
+        result = send_invitation_email(
+            "invitee@example.com", "Inviter Name", "inviter@example.com", "Test Company", "developer", "token123"
+        )
+        assert result is False
+
     def test_generate_reset_code_format(self):
         """Test that generated reset codes are 6-digit numeric strings"""
         from apps.authentication.utils import generate_reset_code
