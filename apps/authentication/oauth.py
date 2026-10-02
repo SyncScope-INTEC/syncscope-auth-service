@@ -66,7 +66,7 @@ def get_github_user_data(access_token):
     }
 
 
-def create_or_update_user_from_github(github_data):
+def create_or_update_user_from_github(github_data, invitation_token=None):
     """Create or update user from GitHub data"""
     email = github_data.get("email")
     if not email:
@@ -85,8 +85,12 @@ def create_or_update_user_from_github(github_data):
             if len(name_parts) > 1 and not user.last_name:
                 user.last_name = name_parts[1]
 
+        # Always update GitHub username when logging in with GitHub
+        if github_data.get("login"):
+            user.github_username = github_data["login"]
+
         user.save()
-        return user
+        return user, False  # Existing user
 
     except User.DoesNotExist:
         # Create new user
@@ -95,8 +99,10 @@ def create_or_update_user_from_github(github_data):
             name_parts = github_data["name"].split(" ", 1)
 
         # Handle company creation/assignment
+        # If there's an invitation token, don't auto-create company from GitHub
+        # Let the invitation handle company assignment
         company = None
-        if github_data.get("company"):
+        if not invitation_token and github_data.get("company"):
             company_name = github_data["company"].strip()
             if company_name:
                 domain = extract_domain_from_email(email)
@@ -108,17 +114,23 @@ def create_or_update_user_from_github(github_data):
             last_name=name_parts[1] if len(name_parts) > 1 else "",
             company=company,
             role="developer",  # Default role for OAuth users
+            github_username=github_data.get("login"),
         )
 
-        return user
+        return user, True  # New user
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def github_oauth_callback(request):
     """Handle GitHub OAuth callback"""
+    from django.shortcuts import redirect
+
+    from .models import CompanyInvitation
+
     code = request.GET.get("code")
-    state = request.GET.get("state")  # Get state parameter if present
+    state = request.GET.get("state")  # Get state parameter if present (desktop agent)
+    invitation_token = request.GET.get("invitation_token")  # Check for invitation token
 
     if not code:
         return Response({"error": "Authorization code is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -130,16 +142,40 @@ def github_oauth_callback(request):
         with transaction.atomic():
             access_token = exchange_code_for_token(code)
             github_data = get_github_user_data(access_token)
-            user = create_or_update_user_from_github(github_data)
+            user, is_new_user = create_or_update_user_from_github(github_data, invitation_token)
+
+            # Handle invitation if token is present
+            invitation_accepted = False
+            company_name = None
+            if invitation_token:
+                invitation = CompanyInvitation.get_active_invitation(invitation_token)
+                if invitation:
+                    # Verify the invitation email matches the GitHub email
+                    if invitation.invitee_email.lower() == user.email.lower():
+                        try:
+                            invitation.accept(user)
+                            invitation_accepted = True
+                            company_name = invitation.company.name
+                        except ValueError:
+                            # Invitation already accepted or expired, ignore error
+                            pass
 
             session, session_token = create_user_session(user, request)
             tokens = get_tokens_for_user(user)
 
+            # Refresh user data after invitation acceptance
+            user.refresh_from_db()
+
+            message = "GitHub authentication successful"
+            if invitation_accepted:
+                message = f"Welcome to {company_name}! Your account has been linked to the company."
+
             response_data = {
-                "message": "GitHub authentication successful",
+                "message": message,
                 "user": UserProfileSerializer(user).data,
                 "tokens": tokens,
                 "session_token": session_token,
+                "invitation_accepted": invitation_accepted,
             }
 
             # If state parameter present, this is from desktop agent - store tokens in cache
@@ -156,6 +192,7 @@ def github_oauth_callback(request):
                             "user": response_data["user"],
                             "tokens": response_data["tokens"],
                             "session_token": response_data["session_token"],
+                            "invitation_accepted": invitation_accepted,
                         },
                         timeout=300,  # Keep for 5 minutes to allow agent to retrieve
                     )
@@ -166,8 +203,28 @@ def github_oauth_callback(request):
 
                     template = loader.get_template("authentication/oauth_callback.html")
                     return HttpResponse(template.render({}, request))
+            else:
+                # Web OAuth flow - store tokens in cache and redirect to frontend
+                import uuid
 
-            # Regular web OAuth flow - return JSON
+                web_token_key = str(uuid.uuid4())
+                cache.set(
+                    f"web_oauth_tokens_{web_token_key}",
+                    {
+                        "user": response_data["user"],
+                        "tokens": response_data["tokens"],
+                        "session_token": response_data["session_token"],
+                        "invitation_accepted": invitation_accepted,
+                    },
+                    timeout=300,  # 5 minutes
+                )
+
+                # Redirect to frontend with token key
+                frontend_url = settings.FRONTEND_URL or "https://syncscope-frontend-dev.up.railway.app"
+                redirect_url = f"{frontend_url}/auth/github/callback?token_key={web_token_key}"
+                return redirect(redirect_url)
+
+            # Should not reach here
             return Response(response_data, status=status.HTTP_200_OK)
 
     except requests.RequestException as e:
@@ -206,16 +263,24 @@ def github_oauth_callback(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def github_oauth_url(request):
-    """Get GitHub OAuth URL"""
+    """Get GitHub OAuth URL with optional invitation token"""
     if not settings.GITHUB_CLIENT_ID:
         return Response({"error": "GitHub OAuth not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Build redirect URI with proper HTTPS handling
+    # Get invitation token from query params if present
+    invitation_token = request.GET.get("invitation_token")
+
+    # Build redirect URI - always use backend callback
     redirect_uri = request.build_absolute_uri("/auth/github/callback/")
 
     # Ensure HTTPS for production deployments
     if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
         redirect_uri = redirect_uri.replace("http://", "https://")
+
+    # Add invitation token to redirect URI if present
+    if invitation_token:
+        separator = "&" if "?" in redirect_uri else "?"
+        redirect_uri = f"{redirect_uri}{separator}invitation_token={invitation_token}"
 
     oauth_url = (
         f"https://github.com/login/oauth/authorize"
@@ -305,3 +370,31 @@ def github_oauth_status(request, state_id):
         return Response({"status": "error", "error": error_message}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({"status": "unknown", "error": "Invalid state"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def github_web_tokens(request, token_key):
+    """Retrieve OAuth tokens for web flow using token key"""
+    cache_key = f"web_oauth_tokens_{token_key}"
+    token_data = cache.get(cache_key)
+
+    if not token_data:
+        return Response(
+            {"error": "Token key expired or not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Return tokens and clean up
+    response_data = {
+        "message": "Authentication successful",
+        "user": token_data["user"],
+        "tokens": token_data["tokens"],
+        "session_token": token_data["session_token"],
+        "invitation_accepted": token_data.get("invitation_accepted", False),
+    }
+
+    # Delete from cache after retrieval
+    cache.delete(cache_key)
+
+    return Response(response_data, status=status.HTTP_200_OK)

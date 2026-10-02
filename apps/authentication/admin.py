@@ -15,16 +15,16 @@ class CompanyAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ["email", "first_name", "last_name", "role", "company", "is_active"]
-    list_filter = ["role", "is_active", "is_staff", "company", "date_joined"]
+    list_display = ["email", "first_name", "last_name", "role", "plan", "company", "is_active"]
+    list_filter = ["role", "plan", "is_active", "is_staff", "company", "date_joined"]
     search_fields = ["email", "first_name", "last_name"]
     readonly_fields = ["id", "date_joined", "updated_at", "last_login"]
     ordering = ["-date_joined"]
 
     fieldsets = (
         (None, {"fields": ("id", "email", "password")}),
-        ("Personal info", {"fields": ("first_name", "last_name", "timezone")}),
-        ("Company info", {"fields": ("company", "role")}),
+        ("Personal info", {"fields": ("first_name", "last_name", "phone_number", "timezone")}),
+        ("Company info", {"fields": ("company", "role", "plan")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Important dates", {"fields": ("last_login", "date_joined", "updated_at")}),
     )
@@ -34,7 +34,17 @@ class UserAdmin(BaseUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "password1", "password2", "first_name", "last_name", "role", "company"),
+                "fields": (
+                    "email",
+                    "password1",
+                    "password2",
+                    "first_name",
+                    "last_name",
+                    "phone_number",
+                    "role",
+                    "plan",
+                    "company",
+                ),
             },
         ),
     )

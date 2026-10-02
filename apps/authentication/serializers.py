@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from config.database_retry import database_retry
 
-from .models import Company, SupervisedUser, User, UserSession
+from .models import Company, CompanyInvitation, SupervisedUser, User, UserSession
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -38,12 +38,24 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "first_name", "last_name", "password", "password_confirm", "company_name", "role"]
+        fields = [
+            "email",
+            "first_name",
+            "last_name",
+            "phone_number",
+            "password",
+            "password_confirm",
+            "company_name",
+            "role",
+            "plan",
+        ]
         extra_kwargs = {
             "role": {"default": "developer", "help_text": "User role: developer, supervisor, or admin"},
+            "plan": {"default": "starter", "help_text": "User plan: starter, growth, or enterprise"},
             "email": {"help_text": "User's email address (must be unique)"},
             "first_name": {"help_text": "User's first name"},
             "last_name": {"help_text": "User's last name"},
+            "phone_number": {"required": False, "help_text": "User's phone number (optional)"},
         }
 
     @database_retry(max_retries=2)
@@ -114,6 +126,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(read_only=True)
     timezone = serializers.CharField()
     date_joined = serializers.DateTimeField(read_only=True)
+    plan_limits = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -122,8 +135,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "phone_number",
             "full_name",
             "role",
+            "plan",
+            "plan_limits",
             "timezone",
             "company",
             "created_at",
@@ -131,14 +147,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "date_joined",
             "is_active",
             "profile_image_path",
+            "github_username",
+            "gitlab_username",
         ]
-        read_only_fields = ["id", "email", "created_at", "updated_at", "profile_image_path"]
+        read_only_fields = [
+            "id",
+            "email",
+            "created_at",
+            "updated_at",
+            "profile_image_path",
+            "github_username",
+            "gitlab_username",
+        ]
+
+    def get_plan_limits(self, obj):
+        """Get the limits and features for the user's plan"""
+        try:
+            return obj.get_plan_limits()
+        except ValueError:
+            return None
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "timezone"]
+        fields = ["first_name", "last_name", "phone_number", "timezone", "plan"]
 
     def validate_first_name(self, value):
         if not value or not value.strip():
@@ -329,3 +362,263 @@ class SupervisedUserCreateSerializer(serializers.ModelSerializer):
         validated_data.pop("user_id")
         validated_data.pop("supervisor_id")
         return super().create(validated_data)
+
+
+class PlanLimitsSerializer(serializers.Serializer):
+    """Serializer for plan limits and features"""
+
+    display_name = serializers.CharField()
+    price = serializers.IntegerField()
+    max_users = serializers.IntegerField(allow_null=True, help_text="Maximum users allowed (null = unlimited)")
+    max_integrations = serializers.IntegerField(allow_null=True, help_text="Maximum integrations allowed (null = unlimited)")
+    features = serializers.ListField(child=serializers.CharField())
+    description = serializers.CharField()
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """Serializer for forgot password request"""
+
+    email = serializers.EmailField(required=True, help_text="Email address of the account to reset password for")
+
+    def validate_email(self, value):
+        """Validate that the email exists in the system"""
+        email = value.lower()
+        try:
+            User.objects.get(email=email, is_active=True)
+        except User.DoesNotExist:
+            # Don't reveal whether the email exists for security reasons
+            # Return the same response whether user exists or not
+            pass
+        return email
+
+
+class VerifyResetCodeSerializer(serializers.Serializer):
+    """Serializer for verifying password reset code"""
+
+    email = serializers.EmailField(required=True, help_text="Email address of the account")
+    code = serializers.CharField(required=True, min_length=6, max_length=6, help_text="6-digit reset code from email")
+
+    def validate_code(self, value):
+        """Validate code is 6 digits"""
+        if not value.isdigit():
+            raise serializers.ValidationError("Reset code must be 6 digits")
+        return value
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """Serializer for resetting password with code"""
+
+    email = serializers.EmailField(required=True, help_text="Email address of the account")
+    code = serializers.CharField(required=True, min_length=6, max_length=6, help_text="6-digit reset code from email")
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        help_text="New password (must be at least 8 characters long)",
+        style={"input_type": "password"},
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True,
+        help_text="Confirm new password",
+        style={"input_type": "password"},
+    )
+
+    def validate_code(self, value):
+        """Validate code is 6 digits"""
+        if not value.isdigit():
+            raise serializers.ValidationError("Reset code must be 6 digits")
+        return value
+
+    def validate(self, attrs):
+        """Validate passwords match"""
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError({"new_password_confirm": "Passwords don't match"})
+        return attrs
+
+
+class ForgotPasswordResponseSerializer(serializers.Serializer):
+    """Response serializer for forgot password endpoint"""
+
+    message = serializers.CharField()
+
+
+class VerifyResetCodeResponseSerializer(serializers.Serializer):
+    """Response serializer for verify reset code endpoint"""
+
+    valid = serializers.BooleanField()
+    message = serializers.CharField()
+
+
+class ResetPasswordResponseSerializer(serializers.Serializer):
+    """Response serializer for reset password endpoint"""
+
+    message = serializers.CharField()
+
+
+class SetupAccountSerializer(serializers.Serializer):
+    """Serializer for setting up account after Stripe payment"""
+
+    email = serializers.EmailField(required=True, help_text="User's email address (required)")
+    first_name = serializers.CharField(required=False, allow_blank=True, help_text="User's first name (optional)")
+    last_name = serializers.CharField(required=False, allow_blank=True, help_text="User's last name (optional)")
+    plan = serializers.ChoiceField(
+        choices=["starter", "growth", "enterprise"],
+        default="starter",
+        help_text="User's subscription plan (default: starter)",
+    )
+
+    def validate_email(self, value):
+        """Normalize email to lowercase"""
+        return value.lower()
+
+
+class SetupAccountResponseSerializer(serializers.Serializer):
+    """Response serializer for setup account endpoint"""
+
+    message = serializers.CharField()
+    email = serializers.EmailField()
+    user_id = serializers.UUIDField()
+    user_created = serializers.BooleanField(help_text="True if new user was created, False if existing user was updated")
+
+
+class ChangeInitialPasswordSerializer(serializers.Serializer):
+    """Serializer for changing initial temporary password"""
+
+    temp_password = serializers.CharField(
+        write_only=True, required=True, help_text="Current temporary password", style={"input_type": "password"}
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        help_text="New password (must be at least 8 characters long)",
+        style={"input_type": "password"},
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True, help_text="Confirm new password", style={"input_type": "password"}
+    )
+
+    def validate(self, attrs):
+        """Validate passwords match"""
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError({"new_password_confirm": "Passwords don't match"})
+
+        # Validate temp password is correct
+        user = self.context["request"].user
+        if not user.check_password(attrs["temp_password"]):
+            raise serializers.ValidationError({"temp_password": "Temporary password is incorrect"})
+
+        return attrs
+
+
+class ChangeInitialPasswordResponseSerializer(serializers.Serializer):
+    """Response serializer for change initial password endpoint"""
+
+    message = serializers.CharField()
+    tokens = serializers.DictField(child=serializers.CharField(), help_text="New JWT tokens after password change")
+
+
+class CompanyInvitationSerializer(serializers.ModelSerializer):
+    """Serializer for company invitations"""
+
+    company_name = serializers.CharField(source="company.name", read_only=True)
+    inviter_name = serializers.CharField(source="inviter.full_name", read_only=True)
+    inviter_email = serializers.EmailField(source="inviter.email", read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+    is_valid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = CompanyInvitation
+        fields = [
+            "id",
+            "company",
+            "company_name",
+            "inviter",
+            "inviter_name",
+            "inviter_email",
+            "invitee_email",
+            "role",
+            "token",
+            "created_at",
+            "expires_at",
+            "is_accepted",
+            "accepted_at",
+            "is_expired",
+            "is_valid",
+        ]
+        read_only_fields = [
+            "id",
+            "token",
+            "created_at",
+            "expires_at",
+            "is_accepted",
+            "accepted_at",
+            "company_name",
+            "inviter_name",
+            "inviter_email",
+            "is_expired",
+            "is_valid",
+        ]
+
+
+class InviteUserSerializer(serializers.Serializer):
+    """Serializer for inviting a new user to join a company"""
+
+    invitee_email = serializers.EmailField(required=True, help_text="Email address of the person to invite")
+    role = serializers.ChoiceField(
+        choices=["admin", "supervisor", "developer"],
+        default="developer",
+        help_text="Role for the invited user (default: developer)",
+    )
+
+    def validate_invitee_email(self, value):
+        """Validate and normalize email"""
+        return value.lower()
+
+    @database_retry(max_retries=2)
+    def validate(self, attrs):
+        """Validate invitation request"""
+        user = self.context["request"].user
+        invitee_email = attrs["invitee_email"]
+
+        # Check if user already exists with this email
+        if User.objects.filter(email=invitee_email, is_active=True).exists():
+            existing_user = User.objects.get(email=invitee_email)
+            if existing_user.company == user.company:
+                raise serializers.ValidationError({"invitee_email": "This user is already part of your company"})
+
+        # Check if there's already a pending invitation
+        if CompanyInvitation.objects.filter(company=user.company, invitee_email=invitee_email, is_accepted=False).exists():
+            raise serializers.ValidationError({"invitee_email": "An invitation has already been sent to this email"})
+
+        return attrs
+
+
+class AcceptInvitationSerializer(serializers.Serializer):
+    """Serializer for accepting a company invitation"""
+
+    token = serializers.CharField(required=True, help_text="Invitation token from the email")
+
+    @database_retry(max_retries=2)
+    def validate_token(self, value):
+        """Validate that the token exists and is valid"""
+        invitation = CompanyInvitation.get_active_invitation(value)
+        if not invitation:
+            raise serializers.ValidationError("Invalid or expired invitation token")
+
+        self.context["invitation"] = invitation
+        return value
+
+
+class InviteUserResponseSerializer(serializers.Serializer):
+    """Response serializer for invite user endpoint"""
+
+    message = serializers.CharField()
+    invitation_id = serializers.UUIDField()
+    invitee_email = serializers.EmailField()
+
+
+class AcceptInvitationResponseSerializer(serializers.Serializer):
+    """Response serializer for accept invitation endpoint"""
+
+    message = serializers.CharField()
+    user = UserProfileSerializer()
+    company_name = serializers.CharField()

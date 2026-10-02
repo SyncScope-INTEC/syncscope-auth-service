@@ -159,7 +159,7 @@ jobs:
           pip install diff-cover
 
           # Run all tests with coverage report generation
-          coverage run -m pytest tests/ --ds=config.settings
+          coverage run -m pytest tests/ --ds=config.test_settings
 
           # Generate both XML and text coverage reports
           coverage xml
@@ -227,7 +227,7 @@ jobs:
           CORS_ALLOWED_ORIGINS: "http://localhost:3000"
         run: |
           # Run tests with full coverage
-          coverage run -m pytest tests/ --ds=config.settings
+          coverage run -m pytest tests/ --ds=config.test_settings
           coverage report
           coverage xml
 
@@ -392,7 +392,7 @@ jobs:
           python manage.py spectacular --file schema.yml
 
       - name: Upload schema artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: openapi-schema
           path: schema.yml

@@ -3,6 +3,7 @@
 Health check script for serverless deployments
 Can be used as a standalone script or imported
 """
+
 import os
 import sys
 from datetime import datetime

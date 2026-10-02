@@ -1,3 +1,4 @@
+import logging
 import os
 
 from django.contrib.auth import authenticate
@@ -21,16 +22,29 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from config.database_retry import atomic_with_retry
 
 from .db_mixins import ServerlessViewMixin
-from .models import SupervisedUser, User, UserSession
+from .models import PasswordResetToken, SupervisedUser, User, UserSession
 from .serializers import (
+    AcceptInvitationResponseSerializer,
+    AcceptInvitationSerializer,
     AuthResponseSerializer,
+    ChangeInitialPasswordResponseSerializer,
+    ChangeInitialPasswordSerializer,
+    CompanyInvitationSerializer,
     ErrorResponseSerializer,
+    ForgotPasswordResponseSerializer,
+    ForgotPasswordSerializer,
+    InviteUserResponseSerializer,
+    InviteUserSerializer,
     LogoutResponseSerializer,
     LogoutSerializer,
     PasswordChangeResponseSerializer,
     PasswordChangeSerializer,
+    ResetPasswordResponseSerializer,
+    ResetPasswordSerializer,
     SessionTerminationResponseSerializer,
     SessionTerminationSerializer,
+    SetupAccountResponseSerializer,
+    SetupAccountSerializer,
     SupervisedUserCreateSerializer,
     SupervisedUserSerializer,
     TokenRefreshRequestSerializer,
@@ -42,8 +56,23 @@ from .serializers import (
     UserRegistrationSerializer,
     UserSessionSerializer,
     UserUpdateSerializer,
+    VerifyResetCodeResponseSerializer,
+    VerifyResetCodeSerializer,
 )
-from .utils import create_user_session, get_client_ip, get_tokens_for_user, invalidate_user_sessions, validate_session_token
+from .utils import (
+    create_user_session,
+    generate_reset_code,
+    generate_temp_password,
+    get_client_ip,
+    get_tokens_for_user,
+    hash_token,
+    invalidate_user_sessions,
+    send_reset_email,
+    send_welcome_email,
+    validate_session_token,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema_view(
@@ -111,15 +140,19 @@ class LoginView(ServerlessViewMixin, APIView):
             user.last_login = timezone.now()
             user.save(update_fields=["last_login"])
 
-            return Response(
-                {
-                    "message": "Login successful",
-                    "user": UserProfileSerializer(user).data,
-                    "tokens": tokens,
-                    "session_token": token,
-                },
-                status=status.HTTP_200_OK,
-            )
+            # Check if user needs to change their password (temporary password from Stripe setup)
+            response_data = {
+                "message": "Login successful",
+                "user": UserProfileSerializer(user).data,
+                "tokens": tokens,
+                "session_token": token,
+            }
+
+            if user.requires_password_change:
+                response_data["requires_password_change"] = True
+                response_data["message"] = "Login successful. You must change your temporary password before continuing."
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -188,6 +221,40 @@ class ProfileView(ServerlessViewMixin, APIView):
             user = serializer.save()
             return Response(UserProfileSerializer(user).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    tags=["User Profile"],
+    summary="Get user by ID",
+    description="Get user details by user ID. **Authentication required: Include 'Bearer <access_token>' in Authorization header.**",
+    parameters=[
+        OpenApiParameter(
+            name="user_id",
+            type=OpenApiTypes.UUID,
+            location=OpenApiParameter.PATH,
+            description="User ID (UUID)",
+            required=True,
+        )
+    ],
+    responses={
+        200: UserProfileSerializer,
+        404: ErrorResponseSerializer,
+        401: ErrorResponseSerializer,
+    },
+)
+class UserByIdView(ServerlessViewMixin, APIView):
+    """Get user details by user ID"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, user_id):
+        """Get user by ID"""
+        try:
+            user = User.objects.get(id=user_id)
+            serializer = UserProfileSerializer(user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @extend_schema_view(
@@ -750,3 +817,547 @@ class UserImageView(ServerlessViewMixin, APIView):
             )
         except Exception as e:
             raise Http404("Could not retrieve profile image")
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Password Reset"],
+        summary="Request password reset code",
+        description="Request a 6-digit password reset code to be sent via email. Rate limited to 3 requests per hour.",
+        request=ForgotPasswordSerializer,
+        responses={
+            200: ForgotPasswordResponseSerializer,
+            400: ErrorResponseSerializer,
+            429: ErrorResponseSerializer,
+        },
+    )
+)
+@method_decorator(ratelimit(key="ip", rate="3/h", method="POST"), name="post")
+class ForgotPasswordView(ServerlessViewMixin, APIView):
+    """Request password reset code"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(email=email, is_active=True)
+
+            # Invalidate any existing reset tokens for this user
+            PasswordResetToken.invalidate_user_tokens(user)
+
+            # Generate new 6-digit code
+            reset_code = generate_reset_code()
+            code_hash = hash_token(reset_code)
+
+            # Create reset token
+            PasswordResetToken.objects.create(user=user, code_hash=code_hash)
+
+            # Send email via alerts service
+            user_name = user.full_name or user.email
+            email_sent = send_reset_email(user.email, user_name, reset_code)
+
+            if not email_sent:
+                return Response(
+                    {"error": "Failed to send reset email. Please try again later."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        except User.DoesNotExist:
+            # Don't reveal that user doesn't exist for security
+            pass
+
+        # Always return success to prevent user enumeration
+        return Response(
+            {
+                "message": "If an account with that email exists, a password reset code has been sent. The code will expire in 1 hour."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Password Reset"],
+        summary="Verify password reset code",
+        description="Verify that a 6-digit reset code is valid before attempting password reset. Maximum 5 attempts allowed.",
+        request=VerifyResetCodeSerializer,
+        responses={
+            200: VerifyResetCodeResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+)
+class VerifyResetCodeView(ServerlessViewMixin, APIView):
+    """Verify password reset code without resetting password"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = VerifyResetCodeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+        code_hash = hash_token(code)
+
+        try:
+            user = User.objects.get(email=email, is_active=True)
+
+            # Get the most recent valid token
+            reset_token = (
+                PasswordResetToken.objects.filter(user=user, code_hash=code_hash, is_used=False, is_invalidated=False)
+                .order_by("-created_at")
+                .first()
+            )
+
+            if not reset_token:
+                return Response(
+                    {"valid": False, "message": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if token is valid
+            if not reset_token.is_valid():
+                if reset_token.is_expired():
+                    return Response(
+                        {"valid": False, "message": "Reset code has expired. Please request a new one."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                elif reset_token.attempts >= 5:
+                    return Response(
+                        {
+                            "valid": False,
+                            "message": "Maximum verification attempts exceeded. Please request a new reset code.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                else:
+                    return Response(
+                        {"valid": False, "message": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            return Response({"valid": True, "message": "Reset code is valid"}, status=status.HTTP_200_OK)
+
+        except User.DoesNotExist:
+            return Response({"valid": False, "message": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Password Reset"],
+        summary="Reset password with code",
+        description="Reset password using the 6-digit code received via email. All active sessions will be terminated.",
+        request=ResetPasswordSerializer,
+        responses={
+            200: ResetPasswordResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+)
+class ResetPasswordView(ServerlessViewMixin, APIView):
+    """Reset password using verification code"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+        new_password = serializer.validated_data["new_password"]
+        code_hash = hash_token(code)
+
+        try:
+            user = User.objects.get(email=email, is_active=True)
+
+            # Get the most recent valid token
+            reset_token = (
+                PasswordResetToken.objects.filter(user=user, code_hash=code_hash, is_used=False, is_invalidated=False)
+                .order_by("-created_at")
+                .first()
+            )
+
+            if not reset_token:
+                return Response({"error": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Increment attempts
+            reset_token.increment_attempts()
+
+            # Check if token is still valid after incrementing
+            if not reset_token.is_valid():
+                if reset_token.is_expired():
+                    return Response(
+                        {"error": "Reset code has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST
+                    )
+                elif reset_token.is_invalidated:
+                    return Response(
+                        {"error": "Maximum attempts exceeded. Please request a new reset code."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                else:
+                    return Response({"error": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Reset password
+            user.set_password(new_password)
+            user.save(update_fields=["password"])
+
+            # Mark token as used
+            reset_token.mark_as_used()
+
+            # Invalidate all active sessions (log out all devices)
+            invalidate_user_sessions(user)
+
+            return Response(
+                {"message": "Password has been reset successfully. Please log in with your new password."},
+                status=status.HTTP_200_OK,
+            )
+
+        except User.DoesNotExist:
+            return Response({"error": "Invalid or expired reset code"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Account Setup"],
+        summary="Setup account after Stripe payment",
+        description="Create or update user account with temporary password after Stripe payment. Sends welcome email with credentials. Public endpoint - no authentication required.",
+        request=SetupAccountSerializer,
+        responses={
+            200: SetupAccountResponseSerializer,
+            201: SetupAccountResponseSerializer,
+            400: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
+)
+@method_decorator(ratelimit(key="ip", rate="5/m", method="POST"), name="post")
+class SetupAccountView(ServerlessViewMixin, APIView):
+    """Setup account after Stripe payment with temporary password"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = SetupAccountSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        first_name = serializer.validated_data.get("first_name", "")
+        last_name = serializer.validated_data.get("last_name", "")
+        plan = serializer.validated_data.get("plan", "starter")
+
+        # Generate temporary password
+        temp_password = generate_temp_password()
+
+        # Check if user already exists
+        try:
+            user = User.objects.get(email=email)
+            user_created = False
+
+            # Update existing user with new temporary password
+            user.set_password(temp_password)
+            user.requires_password_change = True
+
+            # Update name and plan if provided
+            if first_name:
+                user.first_name = first_name
+            if last_name:
+                user.last_name = last_name
+            user.plan = plan
+
+            user.save()
+
+        except User.DoesNotExist:
+            # Create new user
+            user_created = True
+            user = User.objects.create_user(
+                email=email,
+                password=temp_password,
+                first_name=first_name or "User",
+                last_name=last_name or "",
+                plan=plan,
+                requires_password_change=True,
+            )
+
+        # Send welcome email with temporary password
+        user_name = user.full_name or user.email
+        email_sent = send_welcome_email(user.email, user_name, temp_password, plan)
+
+        if not email_sent:
+            return Response(
+                {"error": "Account created but failed to send welcome email. Please contact support."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        status_code = status.HTTP_201_CREATED if user_created else status.HTTP_200_OK
+        message = "Account created successfully" if user_created else "Account updated successfully"
+
+        return Response(
+            {
+                "message": f"{message}. Welcome email sent with temporary password.",
+                "email": user.email,
+                "user_id": str(user.id),
+                "user_created": user_created,
+            },
+            status=status_code,
+        )
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Account Setup"],
+        summary="Change initial temporary password",
+        description="Change temporary password received via email to a new permanent password. Requires authentication with temporary password. Returns new JWT tokens.",
+        request=ChangeInitialPasswordSerializer,
+        responses={
+            200: ChangeInitialPasswordResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    )
+)
+class ChangeInitialPasswordView(ServerlessViewMixin, APIView):
+    """Change initial temporary password to permanent password"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        serializer = ChangeInitialPasswordSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        new_password = serializer.validated_data["new_password"]
+
+        # Set new password and clear the requires_password_change flag
+        user.set_password(new_password)
+        user.requires_password_change = False
+        user.save(update_fields=["password", "requires_password_change"])
+
+        # Invalidate all existing sessions (force re-login everywhere)
+        invalidate_user_sessions(user)
+
+        # Generate new tokens for this session
+        tokens = get_tokens_for_user(user)
+
+        return Response(
+            {"message": "Password changed successfully. Please use your new password for future logins.", "tokens": tokens},
+            status=status.HTTP_200_OK,
+        )
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Company Invitations"],
+        summary="Invite a user to join your company",
+        description="Send an invitation email to a new user to join your company. Requires authentication. The invitee will receive an email with a link to accept the invitation and join via GitHub OAuth.",
+        request=InviteUserSerializer,
+        responses={
+            201: InviteUserResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Company Invitations"],
+        summary="List company invitations",
+        description="Get a list of all invitations sent by users in your company. Requires authentication.",
+        responses={
+            200: CompanyInvitationSerializer(many=True),
+            401: ErrorResponseSerializer,
+        },
+    ),
+)
+class CompanyInvitationView(ServerlessViewMixin, APIView):
+    """Create and list company invitations"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Send a company invitation"""
+        from .models import CompanyInvitation
+        from .utils import send_invitation_email
+
+        user = request.user
+
+        # Check if user has a company
+        if not user.company:
+            return Response(
+                {"error": "You must be associated with a company to send invitations"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check if user can invite (must be admin or supervisor)
+        if user.role not in ["admin", "supervisor"]:
+            return Response(
+                {"error": "Only administrators and supervisors can send invitations"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = InviteUserSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        invitee_email = serializer.validated_data["invitee_email"]
+        role = serializer.validated_data["role"]
+
+        # Check for existing pending invitation
+        existing_invitation = CompanyInvitation.objects.filter(
+            company=user.company,
+            invitee_email=invitee_email,
+            is_accepted=False,
+        ).first()
+
+        if existing_invitation:
+            if existing_invitation.is_expired():
+                # Delete expired invitation to allow sending a new one
+                existing_invitation.delete()
+            else:
+                # Active invitation already exists
+                return Response(
+                    {
+                        "error": f"An invitation has already been sent to {invitee_email}. Please wait for it to expire or be accepted."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Create the invitation
+        invitation = CompanyInvitation.objects.create(
+            company=user.company, inviter=user, invitee_email=invitee_email, role=role
+        )
+
+        # Send invitation email
+        email_sent = send_invitation_email(
+            invitee_email=invitee_email,
+            inviter_name=user.full_name or user.email,
+            inviter_email=user.email,
+            company_name=user.company.name,
+            role=role,
+            invitation_token=invitation.token,
+        )
+
+        if not email_sent:
+            # Still return success even if email fails, but log it
+            logger.warning(f"Failed to send invitation email to {invitee_email}")
+
+        return Response(
+            {
+                "message": f"Invitation sent to {invitee_email}",
+                "invitation_id": invitation.id,
+                "invitee_email": invitee_email,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def get(self, request):
+        """List all invitations for the user's company"""
+        from .models import CompanyInvitation
+
+        user = request.user
+
+        if not user.company:
+            return Response([], status=status.HTTP_200_OK)
+
+        # Get all invitations for the company
+        invitations = CompanyInvitation.objects.filter(company=user.company).order_by("-created_at")
+        serializer = CompanyInvitationSerializer(invitations, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Company Invitations"],
+        summary="Accept a company invitation",
+        description="Accept a company invitation using the token from the email. This endpoint should be called after the user authenticates via GitHub OAuth. The user will be associated with the company.",
+        request=AcceptInvitationSerializer,
+        responses={
+            200: AcceptInvitationResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Company Invitations"],
+        summary="Validate invitation token",
+        description="Validate an invitation token without accepting it. Returns invitation details if valid.",
+        responses={
+            200: CompanyInvitationSerializer,
+            400: ErrorResponseSerializer,
+        },
+    ),
+)
+class AcceptInvitationView(ServerlessViewMixin, APIView):
+    """Accept or validate a company invitation"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Accept a company invitation"""
+        from .models import CompanyInvitation
+
+        serializer = AcceptInvitationSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = serializer.context["invitation"]
+        user = request.user
+
+        # Check if user is already part of a different company
+        if user.company and user.company != invitation.company:
+            return Response(
+                {"error": f"You are already part of {user.company.name}. Please contact support to change companies."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Accept the invitation (this also updates the user's company and role)
+        try:
+            invitation.accept(user)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Serialize user data
+        from .serializers import UserProfileSerializer
+
+        user.refresh_from_db()
+        user_serializer = UserProfileSerializer(user)
+
+        return Response(
+            {
+                "message": f"Welcome to {invitation.company.name}!",
+                "user": user_serializer.data,
+                "company_name": invitation.company.name,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def get(self, request):
+        """Validate invitation token and return invitation details"""
+        from .models import CompanyInvitation
+
+        token = request.query_params.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = CompanyInvitation.get_active_invitation(token)
+        if not invitation:
+            return Response({"error": "Invalid or expired invitation token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = CompanyInvitationSerializer(invitation)
+        return Response(serializer.data, status=status.HTTP_200_OK)
